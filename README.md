@@ -1,557 +1,763 @@
 # Synera: Synergy Auto-Arena
+<small>（Synera：协同自走棋竞技场）</small>
 
-## 1. 基本信息
+**Synera: Synergy Auto-Arena** is a lightweight single-player PvE auto-battler game developed with **C++17**, **Qt6**, and **CMake**.  
+<small>（**Synera: Synergy Auto-Arena** 是一款使用 **C++17**、**Qt6** 和 **CMake** 开发的轻量级单人 PvE 自走棋游戏。）</small>
 
-- **项目名称**：Synera: Synergy Auto-Arena
-- **课程**：高级程序设计 PA
-- **姓名**：束宇轩
-- **学号**：251880244
-- **开发语言**：C++17
-- **图形界面**：Qt6
-- **构建工具**：CMake
-- **开发环境**：macOS + CLion + Qt6
-- **项目类型**：单机 PvE 轻量级自走棋
+The project explores how an auto-battler game can be structured with object-oriented programming, including a unified unit model, polymorphic hero skills, grid-based combat, BFS pathfinding, equipment systems, synergy effects, and JSON-based save/load support.  
+<small>（本项目探索如何用面向对象程序设计组织一个自走棋游戏系统，包括统一单位模型、多态英雄技能、网格战斗、BFS 寻路、装备系统、羁绊效果，以及基于 JSON 的存档与读档支持。）</small>
 
-本项目基于课程提供的 Starter Code 继续开发，在原 Demo 框架（网格、拖拽、Qt 基础场景）基础上，重构并扩展了完整的面向对象战斗单位体系、经济系统、羁绊系统、升星机制、装备系统、存档读档、敌方 AI 运营 agent、战斗弹道与特效等模块。核心逻辑全部自研。
+## Overview
+<small>（项目概述）</small>
 
-### 各阶段完成度总览
+Synera follows the core loop of an auto-battler game:  
+<small>（Synera 遵循自走棋游戏的核心循环：）</small>
 
-| 阶段 | 完成状态 | 实现功能                                    |
-|------|----------|-----------------------------------------|
-| 阶段一（棋盘/单位/拖拽/GUI） | 已完成 | 8×8 棋盘、备战区、单位基类、owner 区分、拖拽换位/回弹、GUI 展示 |
-| 阶段二（战斗/状态机/寻路/技能） | 已完成 | 三阶段循环、FSM、BFS 寻路、索敌、12 英雄多态技能、胜负结算      |
-| 阶段三（商店/经济/羁绊/升星/装备/存档） | 已完成* | 全部实现，其中，商店槽位由 5 改为 2 ，为平衡性调整            |
-| 阶段四（扩展） | 已完成 | 利息机制、连败补偿、装备合成树、弹道特效、智能索敌               |
+1. **Preparation Phase**  
+   <small>（**准备阶段**）</small>
 
-## 2. 文件结构
+   The player buys units from the shop, manages gold, places units on the board, equips items, and adjusts formation.  
+   <small>（玩家可以从商店购买单位，管理金币，将单位放置到棋盘上，装备物品，并调整阵型。）</small>
+
+2. **Combat Phase**  
+   <small>（**战斗阶段**）</small>
+
+   Player units and enemy units automatically search for targets, move across the board, attack, gain mana, and cast skills.  
+   <small>（玩家单位和敌方单位会自动寻找目标，在棋盘上移动、攻击、获得法力值并释放技能。）</small>
+
+3. **Settlement Phase**  
+   <small>（**结算阶段**）</small>
+
+   The game resolves the result of the round, grants rewards, handles equipment drops, updates player HP, and advances to the next round.  
+   <small>（游戏会结算本回合结果，发放奖励，处理装备掉落，更新玩家生命值，并进入下一回合。）</small>
+
+The game is implemented as a single-player PvE experience. Enemy formations are controlled by a simple preparation agent that performs buying, upgrading, deployment, and formation decisions.  
+<small>（本游戏实现为单人 PvE 体验。敌方阵容由一个简单的准备阶段智能体控制，用于执行购买、升级、部署和阵型决策。）</small>
+
+## Features
+<small>（功能特性）</small>
+
+- 8 × 8 grid-based battlefield  
+  <small>（8 × 8 网格战场）</small>
+
+- Player board and enemy board areas  
+  <small>（玩家棋盘区域与敌方棋盘区域）</small>
+
+- Bench system for undeployed units  
+  <small>（用于存放未上场单位的备战区系统）</small>
+
+- Drag-and-drop unit placement  
+  <small>（支持拖拽式单位放置）</small>
+
+- Unified `Unit` model for both player and enemy units  
+  <small>（玩家单位和敌方单位共用统一的 `Unit` 模型）</small>
+
+- Object-oriented hero system with inheritance and virtual skill dispatch  
+  <small>（基于继承和虚函数技能分派的面向对象英雄系统）</small>
+
+- 12 hero classes with different skill effects  
+  <small>（12 个具有不同技能效果的英雄类）</small>
+
+- Preparation / combat / settlement phase loop  
+  <small>（准备 / 战斗 / 结算阶段循环）</small>
+
+- Unit finite-state machine: `Idle`, `Moving`, `Attacking`, `Casting`, `Dead`  
+  <small>（单位有限状态机：`Idle`、`Moving`、`Attacking`、`Casting`、`Dead`）</small>
+
+- Automatic target selection  
+  <small>（自动目标选择）</small>
+
+- BFS-based pathfinding with collision avoidance  
+  <small>（基于 BFS 的寻路，并支持碰撞规避）</small>
+
+- Normal attack, mana gain, skill casting, and death handling  
+  <small>（普通攻击、法力值获取、技能释放和死亡处理）</small>
+
+- Shop, gold, refresh, purchase, and population systems  
+  <small>（商店、金币、刷新、购买和人口系统）</small>
+
+- Synergy system with origin and role tags  
+  <small>（基于起源标签和职业标签的羁绊系统）</small>
+
+- Star-upgrade system based on three identical units  
+  <small>（基于三个相同单位合成的升星系统）</small>
+
+- Equipment inventory, equipment wearing, and item synthesis  
+  <small>（装备背包、装备穿戴和装备合成）</small>
+
+- Projectile and simple combat visual effects  
+  <small>（弹道效果和简单战斗视觉效果）</small>
+
+- JSON save/load system  
+  <small>（JSON 存档与读档系统）</small>
+
+- Qt Graphics View based GUI  
+  <small>（基于 Qt Graphics View 的图形界面）</small>
+
+## Tech Stack
+<small>（技术栈）</small>
+
+- **Language**: C++17  
+  <small>（**编程语言**：C++17）</small>
+
+- **GUI Framework**: Qt6  
+  <small>（**图形界面框架**：Qt6）</small>
+
+- **Build System**: CMake  
+  <small>（**构建系统**：CMake）</small>
+
+- **IDE**: CLion  
+  <small>（**开发环境**：CLion）</small>
+
+- **Platform**: macOS  
+  <small>（**平台**：macOS）</small>
+
+## Project Structure
+<small>（项目结构）</small>
 
 ```text
 Synera_Starter/
-├── CMakeLists.txt                  # CMake 构建配置，依赖 Qt6 Widgets/Core/Gui
-├── README.md                       # 项目说明与验收文档（本文件）
-├── assets/                         # 美术资源（当前使用简单方块+文字标注）
+├── CMakeLists.txt
+├── README.md
+├── assets/
 └── src/
-    ├── main.cpp                    # Qt QApplication 入口，创建并显示 GameWindow
-    ├── core/                       # 核心逻辑层
-    │   ├── game.h / game.cpp       # 游戏主控制器：场景、阶段、战斗、经济、装备、存档、敌方 agent
-    │   ├── board.h / board.cpp     # 8×8 棋盘数据结构，管理地块占用与玩家/敌方半场判断
-    │   ├── bench.h / bench.cpp     # 一维备战区（8 格），存放未上阵单位
-    │   └── player.h / player.cpp   # 玩家数据：血量、金币、等级、人口上限、轮次
-    ├── entity/                     # 实体层
+    ├── main.cpp
+    ├── core/
+    │   ├── game.h / game.cpp
+    │   ├── board.h / board.cpp
+    │   ├── bench.h / bench.cpp
+    │   └── player.h / player.cpp
+    ├── entity/
     │   ├── unit/
-    │   │   └── unit.h / unit.cpp   # Unit 基类：所有战斗单位的统一模型
-    │   └── heros/                  # 英雄派生类（12 名）
-    │       ├── cost1/              # 1 费：JarvanIV, Jhin, Rumble, Sona
-    │       ├── cost2/              # 2 费：Ashe, ChoGath, XinZhao, Yasuo
-    │       └── cost3/              # 3 费：Ahri, Jinx, Loris, Sejuani
-    └── gui/                        # GUI 展示层
-        ├── gamewindow.h / .cpp     # 主窗口：棋盘、状态栏、商店、装备栏、羁绊展示
-        ├── unititem.h / .cpp       # 单位图形项：拖拽、高亮、右键详情卡
-        ├── griditem.h / .cpp       # 棋盘格子图形项（六边形）
-        └── equipmentitem.h / .cpp  # 可拖拽的装备图形项
+    │   │   └── unit.h / unit.cpp
+    │   └── heros/
+    │       ├── cost1/
+    │       ├── cost2/
+    │       └── cost3/
+    └── gui/
+        ├── gamewindow.h / gamewindow.cpp
+        ├── unititem.h / unititem.cpp
+        ├── griditem.h / griditem.cpp
+        └── equipmentitem.h / equipmentitem.cpp
 ```
 
-- `src/main.cpp`：Qt 应用入口，创建 QApplication 和 GameWindow 主窗口。
-- `src/core/`：游戏核心逻辑层。`game.cpp` 约 3071 行，是项目最核心文件，负责整合所有子系统。
-- `src/entity/unit/`：`Unit` 基类定义在 `unit.h`，约 186 行，所有 12 个英雄类均继承自它。
-- `src/entity/heros/`：按费用（cost1/cost2/cost3）组织，每个英雄重写 `castSkill()` 实现技能多态。
-- `src/gui/`：基于 Qt Graphics View 框架的 UI 层。`gamewindow.cpp` 约 1226 行。
-
-## 3. 核心类与数据结构设计
+## Main Modules
+<small>（主要模块）</small>
 
-### 3.1 Game 类（`src/core/game.h` / `src/core/game.cpp`）
-
-Game 是游戏主控制器（继承 QObject），负责协调所有子系统：
-
-- **阶段管理**：维护 `GamePhase`（Preparation / Combat），控制 `startCombat()`、`endCombat()`、`finishCombat()` 流程。
-- **单位管理**：维护 `m_units`（所有单位列表）、`m_combatUnits`（战斗副本单位）、`m_preCombatBoardUnits`（备战阵容快照）。
-- **棋盘/备战区**：持有 `Board m_board`、`Bench m_bench`、`Bench m_enemyBench` 实例。
-- **商店**：`m_shopSlots` 存储当前商店槽位（`std::vector<ShopSlot>`），`rollShop()` 刷新，`buyShopUnit()` 购买。
-- **战斗循环**：`combatTick()` 每 200ms 触发一次，遍历双方存活单位执行 FSM 逻辑。
-- **敌方 AI**：`runEnemyPrepareAgent()` 模拟敌方经营决策（购买、刷新、出售、升级、布阵）。
-- **装备**：`m_equipmentInventory` 管理装备库存，`equipInventoryItem()` 处理穿戴与合成。
-- **存档**：`saveGame()` / `loadGame()` 将完整游戏状态序列化为 JSON 文件。
-- **GUI 信号**：通过 `stateChanged()`、`gameFinished()` 信号驱动 GUI 更新。
+- `src/main.cpp`  
+  <small>（`src/main.cpp`）</small>
 
-### 3.2 Player 类（`src/core/player.h` / `src/core/player.cpp`）
+  Qt application entry point. It creates the main game window.  
+  <small>（Qt 应用程序入口，用于创建主游戏窗口。）</small>
 
-Player 管理单个玩家的经营数据：
+- `src/core/game.h / src/core/game.cpp`  
+  <small>（`src/core/game.h / src/core/game.cpp`）</small>
 
-- `m_hp`：血量，初始 100（`kInitialHp = 100`），归零则游戏失败。
-- `m_gold`：金币，初始 6（`kInitialGold = 6`），用于购买、刷新、升级。
-- `m_level`：等级 = 人口上限。初始 1，最高 10（`kMaxLevel = 10`）。
-- `m_levelProgress`：升级进度，每次购买进度消耗 4 金币获得 4 点，各等级所需进度为 {4, 4, 6, 10, 15, 30, 36, 60, 70}。
-- `m_round`：当前轮次，`advanceRound()` 推进。
-- `m_lossStreak`：连败计数，`recordWin()` 清零，`recordLoss()` 递增并返回当前值。
-- `unitCap()`：返回 `m_level`，即当前可上阵的最大单位数。
+  The central game controller. It manages phases, combat logic, shop logic, economy, equipment, enemy preparation, save/load, and GUI synchronization.  
+  <small>（核心游戏控制器，负责管理阶段切换、战斗逻辑、商店逻辑、经济系统、装备系统、敌方准备、存档读档和 GUI 同步。）</small>
 
-### 3.3 Board 类（`src/core/board.h` / `src/core/board.cpp`）
+- `src/core/board.h / src/core/board.cpp`  
+  <small>（`src/core/board.h / src/core/board.cpp`）</small>
 
-Board 管理 8×8 网格上的地块占用：
+  The 8 × 8 board data structure. It manages grid occupation, valid positions, and player/enemy board regions.  
+  <small>（8 × 8 棋盘数据结构，负责管理格子占用、合法位置以及玩家 / 敌方棋盘区域。）</small>
 
-- 8 行 × 8 列（`ROWS=8, COLS=8`）。
-- `addUnit()` / `removeUnit()` 控制单位摆放到指定坐标。
-- `getUnitAt(pos)` / `hasUnitAt(pos)` 查询地块占用。
-- `isPlayerHalf(pos)`：判断坐标是否在玩家半场（第 4-7 行，0-based）。
-- `isValidPosition(pos)`：判断坐标是否在棋盘范围内。
+- `src/core/bench.h / src/core/bench.cpp`  
+  <small>（`src/core/bench.h / src/core/bench.cpp`）</small>
 
-### 3.4 Bench 类（`src/core/bench.h` / `src/core/bench.cpp`）
+  The bench system for undeployed units.  
+  <small>（用于管理未上场单位的备战区系统。）</small>
 
-Bench 管理一维备战区：
+- `src/core/player.h / src/core/player.cpp`  
+  <small>（`src/core/player.h / src/core/player.cpp`）</small>
 
-- `SLOTS = 8`：固定 8 个槽位。
-- `addUnit()` / `removeUnit()` / `getUnitAt()` / `hasUnitAt()` 管理槽位。
-- `swapUnits()`：交换两个槽位的单位。
-- `findUnit()`：查找单位所在的槽位索引。
+  Player state, including HP, gold, level, population cap, round number, and loss streak.  
+  <small>（玩家状态，包括生命值、金币、等级、人口上限、回合数和连败次数。）</small>
 
-### 3.5 Unit 基类（`src/entity/unit/unit.h` / `src/entity/unit/unit.cpp`）
+- `src/entity/unit/unit.h / src/entity/unit/unit.cpp`  
+  <small>（`src/entity/unit/unit.h / src/entity/unit/unit.cpp`）</small>
 
-Unit 是所有战斗单位的统一基类。我方和敌方单位都是 Unit 实例，通过 `m_owner` 字段区分归属（`Owner::PlayerCtrl` / `Owner::EnemyCtrl`），不建两套类型体系。`m_origins` 和 `m_roles` 仅用于羁绊计算，不用于敌我区分。
+  The base Unit class. It defines common combat attributes and the virtual skill interface.  
+  <small>（基础 Unit 类，定义通用战斗属性和虚函数技能接口。）</small>
 
-**核心属性**：
+- `src/entity/heros/`  
+  <small>（`src/entity/heros/`）</small>
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `m_hp` / `m_maxHp` | int | 当前/最大生命值 |
-| `m_atk` | int | 攻击力 |
-| `m_range` | int | 攻击距离（格数） |
-| `m_maxMana` / `m_mana` | int | 最大/当前法力值 |
-| `m_attackSpeed` | double | 攻击速度倍率 |
-| `m_armor` / `m_magicResist` | int | 护甲 / 魔抗 |
-| `m_abilityPower` | int | 法术强度 |
-| `m_critRate` | double | 暴击率 |
-| `m_star` | int | 星级（1-3） |
-| `m_cost` | int | 购买费用 |
-| `m_owner` | Owner | 控制归属（PlayerCtrl / EnemyCtrl） |
-| `m_state` | UnitState | 当前状态机状态 |
-| `m_origins` / `m_roles` | vector | 羁绊标签（种族/职业） |
-| `m_equipment` | vector | 已穿戴的装备类型列表 |
-| `m_heroType` | int | 英雄类型枚举值，用于存档恢复 |
-| `m_positionType` | UnitPositionType | Frontline / Backline |
+  Concrete hero classes. Each hero inherits from Unit and overrides its skill behavior.  
+  <small>（具体英雄类，每个英雄都继承自 Unit，并重写自己的技能行为。）</small>
 
-**虚函数接口**：
+- `src/gui/`  
+  <small>（`src/gui/`）</small>
 
-- `virtual void castSkill(Game* game, Unit* target)`：英雄技能的多态入口。基类默认空实现，各派生类重写以执行不同技能效果。
+  Qt Graphics View based UI layer, including board cells, draggable units, equipment items, status panels, shop display, and skill/equipment information.  
+  <small>（基于 Qt Graphics View 的 UI 层，包括棋盘格、可拖拽单位、装备物品、状态面板、商店显示以及技能 / 装备信息。）</small>
 
-### 3.6 英雄派生类（`src/entity/heros/`）
+## Core Design
+<small>（核心设计）</small>
 
-共 12 名英雄，按费用分为 3 档，均继承自 Unit 并重写 `castSkill()`：
+### Unified Unit Model
+<small>（统一单位模型）</small>
 
-**1 费英雄（cost1/）**：
+Both player units and enemy units use the same Unit class hierarchy. They are not implemented as two separate type systems.  
+<small>（玩家单位和敌方单位使用同一套 Unit 类层次结构，而不是被实现为两套独立的类型系统。）</small>
 
-| 英雄 | 羁绊 | 技能 |
-|------|------|------|
-| Jarvan IV | 德玛西亚 + 护卫 | 德邦军旗：获得持续 4 秒护盾 + 全场友军攻速提升 4 秒 |
-| Jhin | 艾欧尼亚 + 枪手/狙神 | 完美谢幕：4 次强化普攻，第 4 炮额外伤害 |
-| Rumble | 约德尔人 + 护卫 | 机械重组：获得持续 4 秒护盾 + 锥形范围魔法伤害 |
-| Sona | 德玛西亚 + 神谕者 | 能量和弦：对 2 名敌人魔法伤害 + 治疗最低血量友军 |
+The ownership of a unit is represented by an Owner field:  
+<small>（单位的归属由 Owner 字段表示：）</small>
 
-**2 费英雄（cost2/）**：
+```cpp
+Owner::PlayerCtrl
+Owner::EnemyCtrl
+```
 
-| 英雄 | 羁绊 | 技能 |
-|------|------|------|
-| Ashe | 弗雷尔卓德 + 迅捷 | 臻冰之箭：范围伤害 + 低于 30%HP 真实伤害 + 3 秒冰冷 |
-| Cho'Gath | 虚空 + 主宰 | 碎裂：范围击飞 1.5 秒 + 魔法伤害 + 自回血 |
-| Xin Zhao | 德玛西亚/艾欧尼亚 + 神盾使 | 三重爪击：3 连击 + 自回血 + 最后一击 1.5 秒晕眩 |
-| Yasuo | 艾欧尼亚 + 裁决 | 踏前斩：冲刺 + 范围伤害，单目标双倍 |
+Synergy tags are represented separately through origin and role fields. This keeps combat ownership and synergy calculation independent.  
+<small>（羁绊标签通过 origin 和 role 字段单独表示，从而使战斗归属和羁绊计算彼此独立。）</small>
 
-**3 费英雄（cost3/）**：
+### Object-Oriented Hero System
+<small>（面向对象英雄系统）</small>
 
-| 英雄 | 羁绊 | 技能 |
-|------|------|------|
-| Ahri | 艾欧尼亚 + 法师 | 狐火：3 团狐火，每第 3 次施放变为 9 团 |
-| Jinx | 祖安 + 枪手 | 枪炮交响曲：被动切换鱼骨头，发射 3 枚导弹 |
-| Loris | 皮尔特沃夫 + 神盾使 | 皮城争斗：持续 4 秒护盾 + 冲锋击退 + 1.25 秒晕眩 |
-| Sejuani | 弗雷尔卓德 + 护卫 | 凛冬之怒：持续 4 秒护盾 + 范围 4 秒冰冷 + 对已冰冷目标 1 秒晕眩 |
+The base class Unit defines common attributes such as:  
+<small>（基类 Unit 定义了通用属性，例如：）</small>
 
+- HP / Max HP  
+  <small>（生命值 / 最大生命值）</small>
 
-## 4. 关键算法与系统实现
+- Attack damage  
+  <small>（攻击力）</small>
 
-### 4.1 阶段循环与战斗状态机
+- Attack range  
+  <small>（攻击范围）</small>
 
-游戏流程由 `Game::m_phase`（`GamePhase::Preparation` / `GamePhase::Combat`）控制：
+- Mana / Max mana  
+  <small>（法力值 / 最大法力值）</small>
 
-- **Preparation → Combat**：玩家点击 "Start Combat" 触发 `startCombat()`（`game.cpp:1834`）：锁定金币快照、创建战斗副本单位、部署敌方阵容、施加羁绊加成、启动 200ms 战斗定时器。
-- **Combat → Preparation**：战斗胜负确定后 `finishCombat()`（`game.cpp:2535`）：结算基础奖励（4 + 轮次-1 金币）+ 利息 + 连败补偿、胜方额外获得与基础奖励等额金币、败方扣血（扣血量 = 胜方存活单位数，最低 1）、30% 概率掉落装备、推进轮次、恢复备战棋盘。
+- Attack speed  
+  <small>（攻击速度）</small>
 
-**单位状态机**（`UnitState` 枚举，`unit.h:8`）：
+- Armor and magic resistance  
+  <small>（护甲和魔法抗性）</small>
 
-| 状态 | 含义 | 触发条件 |
-|------|------|----------|
-| `Idle` | 空闲 | 被眩晕、攻击冷却中、无目标可攻击 |
-| `Moving` | 移动中 | 有目标但不在攻击范围内，移动冷却 = 300ms |
-| `Attacking` | 攻击中 | 在攻击范围内 + 攻击冷却完成 |
-| `Casting` | 施法中 | 法力值满 |
-| `Dead` | 死亡 | HP ≤ 0 |
+- Star level  
+  <small>（星级）</small>
 
-每帧 `combatTick()`（`game.cpp:2471`）逐单位检查：HP ≤ 0 → Dead；被眩晕 → Idle；攻击冷却中 → Idle；法力满 → Casting 释放技能；在攻击范围内 → Attacking 普攻；否则 → Moving，BFS 寻路移动一步。目标死亡后回到 Idle 并在下一帧重新索敌。
+- Equipment  
+  <small>（装备）</small>
 
-### 4.2 敌人生成与轮次推进
+- Owner  
+  <small>（单位归属）</small>
 
-敌方每轮由 `runEnemyPrepareAgent()`（`game.cpp:3009`）自动运营：优先升级人口（金币充裕时）→ 部署备战区已有单位到上半场（第 0-3 行）→ 多轮购买高分商店单位 → 再次部署 → 调用 `arrangeEnemyFormation()` 按 Frontline/Backline 布阵。敌方随轮次推进自然增强（AI 积累的金币和单位越多，阵容越强）。
+- Current combat state  
+  <small>（当前战斗状态）</small>
 
-### 4.3 目标选择算法
+- Origin and role tags  
+  <small>（起源标签和职业标签）</small>
 
-单位通过 `findNearestEnemy()` 选择攻击目标，由 `targetThreatScore()` 辅助计算威胁评分，综合考量：欧氏距离（越近越高）、当前血量百分比（越低越高）、攻击力（越高越高）、是否为远程（近战额外加分）、是否正在攻击自身（额外加分）。选择威胁评分最高的目标；同分时按距离 → 血量 → 坐标序打破平局。
+It also defines a virtual skill interface:  
+<small>（它还定义了一个虚函数技能接口：）</small>
 
-### 4.4 BFS 寻路与防重叠
+```cpp
+virtual void castSkill(Game* game, Unit* target);
+```
 
-`moveUnitTowardTarget()`（`game.cpp:2695`）实现 BFS 寻路：
+Concrete hero classes inherit from Unit and override this function to implement different skill effects.  
+<small>（具体英雄类继承自 Unit，并重写该函数以实现不同的技能效果。）</small>
 
-1. 检查单位是否已在目标攻击范围内（是则无需移动）
-2. 以当前位置为起点，使用双端队列进行 BFS，搜索 6 个方向（上下左右 + 两个对角）
-3. 跳过已被其他单位占用的格子（`m_board.hasUnitAt()`）和已访问的格子
-4. 使用 `parent` 哈希表记录前驱节点，便于回溯
-5. 找到目标攻击范围内距离最近的可达格子后停止搜索
-6. 沿 parent 从目标格子回溯到起点，取第一步作为移动方向
+This allows the combat system to call:  
+<small>（这使得战斗系统可以调用：）</small>
 
+```cpp
+caster->castSkill(this, target);
+```
 
+through a base-class pointer. At runtime, C++ dynamic dispatch invokes the correct hero-specific skill implementation.  
+<small>（通过基类指针调用技能。在运行时，C++ 的动态绑定机制会调用对应英雄自己的技能实现。）</small>
 
-### 4.5 普攻、回蓝与技能释放
+## Hero Classes
+<small>（英雄类）</small>
 
-1. **普攻**（`performAttack()`）：计算伤害为：ATK - 目标护甲减免，暴击时伤害翻倍。其中，Jhin 的强化普攻特殊处理。Jinx 在 `empoweredShots` 状态下改为发射 3 枚导弹。
-2. **回蓝**：每次普攻回复 10 点法力值（`game.cpp:2389`）。
-3. **技能释放**：法力值 ≥ 最大法力值时，`combatTick()` 设为 Casting，调用 `castSkill()` → `caster->castSkill(this, target)`（虚函数分发），法力值清零（各英雄的 `castSkill()` 开头调用 `setMana(0)`）。
-4. **死亡**：HP ≤ 0 时设为 Dead，`removeDeadUnits()` 从棋盘移除。
+The project currently includes 12 hero classes organized by cost:  
+<small>（本项目目前包含 12 个英雄类，并按照费用进行组织：）</small>
 
-### 4.6 商店与经济系统
+`cost1/`  
+<small>（1 费英雄）</small>
 
-初始金币为 6（`kInitialGold = 6`）。每轮结算时金币来源：
+- JarvanIV  
+  <small>（嘉文四世）</small>
 
-- 每轮基础奖励：4 + (轮次-1) 金币
-- 利息：每 10 金币额外 +1，上限 5 金币（即存 50+ 金币时达到最大值，`interestForGold()`，`game.cpp:195`）
-- 连败补偿：0-1 连败为 0，2 连败 +2 金币，3 连败 +4 金币，≥4 连败 +8 金币（`lossStreakCompensation()`，`game.cpp:181`）
-- 胜利额外奖励：与基础轮次奖励等额
+- Jhin  
+  <small>（烬）</small>
 
-**商店**：`rollShopFor()` 从商店池随机选取，当前 `kShopSlotCount = 2`（`game.cpp:1444`）。购买扣除对应金币，单位进入备战区并触发升星检查。刷新商店花费 4 金币（`kShopRefreshCost = 4`）。
+- Rumble  
+  <small>（兰博）</small>
 
-### 4.7 人口系统
+- Sona  
+  <small>（娑娜）</small>
 
-- 人口上限 = 玩家等级（`m_level`），初始为 1。
-- 升级通过 `buyLevelProgress()` 每次消耗 4 金币获得 4 点进度；各等级所需升级进度为 {4, 4, 6, 10, 15, 30, 36, 60, 70}（`kLevelUpCosts`，`player.h:51`），进度满后自动升级。
-- 上阵时检查 `deployedPlayerUnitCount() < m_player.unitCap()`。
-- 备战区不受人口限制（固定 8 格）。
+`cost2/`  
+<small>（2 费英雄）</small>
 
-### 4.8 羁绊系统
+- Ashe  
+  <small>（艾希）</small>
 
-共实现 6 种羁绊，通过检查战斗副本中单位的标签计数激活：
+- ChoGath  
+  <small>（科加斯）</small>
 
-**属性光环类（4 种）**：
+- XinZhao  
+  <small>（赵信）</small>
 
-| 羁绊 | 类型 | 激活人数 | 效果 |
-|------|------|----------|------|
-| 德玛西亚 | Origin | 2 / ≥3 | 德玛西亚单位 HP +100 / +180 |
-| 艾欧尼亚 | Origin | 2 / ≥3 | 艾欧尼亚单位攻速 ×1.10 / ×1.20 |
-| 弗雷尔卓德 | Origin | ≥2 | 弗雷尔卓德单位护甲 +20，魔抗 +20 |
-| 枪手 | Role | ≥2 | 枪手单位 ATK +15 |
+- Yasuo  
+  <small>（亚索）</small>
 
-**机制改变类（2 种）**：
+`cost3/`  
+<small>（3 费英雄）</small>
 
-| 羁绊 | 类型 | 激活人数 | 效果 |
-|------|------|----------|------|
-| 护卫 | Role | 2 / ≥3 | 护卫单位获得 120 / 220 护盾（护盾持续整场战斗） |
-| 神盾使 | Role | ≥2 | 神盾使单位获得 180 护盾（护盾持续整场战斗） |
+- Ahri  
+  <small>（阿狸）</small>
 
-实现位于 `computeActiveSynergies()`（`game.cpp:2069`），通过 lambda 闭包统计数量并施加 buff。羁绊仅在战斗副本上施加（`applyCombatSynergies()`），不影响备战阵容。
+- Jinx  
+  <small>（金克丝）</small>
 
-### 4.9 升星系统
+- Loris  
+  <small>（洛里斯）</small>
 
-`tryMergeUnit()`（`game.cpp:1611`）实现 3 合 1 升星：
+- Sejuani  
+  <small>（瑟庄妮）</small>
 
-1. 购买单位后自动调用
-2. `findMergeCandidates()` 查找所有同名、同星级的单位（棋盘 + 备战区）
-3. 候选数 ≥ 3 时触发合并：优先保留棋盘上的单位
-4. 删除 2 个，保留 1 个 → 星级 +1、费用 ×3、最大 HP ×2 并回满、ATK ×2、护甲 ×2
+Each hero has its own base attributes, synergy tags, and skill behavior.  
+<small>（每个英雄都有自己的基础属性、羁绊标签和技能行为。）</small>
 
-### 4.10 装备系统
+## Combat System
+<small>（战斗系统）</small>
 
-**基础装备（11 种）**：
+### Phase Loop
+<small>（阶段循环）</small>
 
-| 装备 | 文件定义 | 效果 |
-|------|----------|------|
-| 暴风大剑 | `EquipmentType::BFSword` | ATK +10 |
-| 反曲之弓 | `EquipmentType::RecurveBow` | 攻速 +10% |
-| 无用大棒 | `EquipmentType::NeedlesslyLargeRod` | 法强 +10 |
-| 女神之泪 | `EquipmentType::TearOfTheGoddess` | 法力 +15 |
-| 锁子甲 | `EquipmentType::ChainVest` | 护甲 +20 |
-| 负极斗篷 | `EquipmentType::NegatronCloak` | 魔抗 +20 |
-| 巨人腰带 | `EquipmentType::GiantsBelt` | HP +150 |
-| 拳套 | `EquipmentType::SparringGloves` | 暴击率 +20% |
-| 铁剑 | `EquipmentType::IronSword` | ATK +15 |
-| 急速手套 | `EquipmentType::HasteGloves` | 攻速 +20% |
-| 蓝水晶 | `EquipmentType::BlueCrystal` | 最大法力 -30 |
+The game loop is organized around three major phases:  
+<small>（游戏循环围绕三个主要阶段组织：）</small>
 
-其中铁剑（IronSword, ATK+15）、锁子甲（ChainVest, 护甲+20）、急速手套（HasteGloves, 攻速+20%）、蓝水晶（BlueCrystal, 最大法力-30）覆盖了 PA 文档要求的 4 种基础装备类型。
+```text
+Preparation → Combat → Settlement → Preparation
+```
 
-**装备合成（4 种成装）**：
+During preparation, the player can buy units, refresh the shop, equip items, upgrade level, and adjust board placement.  
+<small>（在准备阶段，玩家可以购买单位、刷新商店、装备物品、升级等级，并调整棋盘站位。）</small>
 
-| 成装 | 配方 | 被动效果 |
-|------|------|----------|
-| 鬼索的狂暴之刃 | 暴风大剑 + 反曲之弓 | 每次普攻后攻速永久提升 6%（可叠加） |
-| 朔极之矛 | 暴风大剑 + 女神之泪 | 每次普攻额外回复 5 点法力 |
-| 荆棘背心 | 锁子甲 + 锁子甲 | 被暴击时反弹 25 点伤害；暴击伤害对穿戴者降低 10% |
-| 狂徒铠甲 | 巨人腰带 + 巨人腰带 | 脱离战斗（3 秒未受击）后每秒回复 5% 最大生命值 |
+During combat, units are controlled by the combat system. They automatically select targets, move, attack, gain mana, and cast skills.  
+<small>（在战斗阶段，单位由战斗系统控制，会自动选择目标、移动、攻击、获得法力值并释放技能。）</small>
 
-合成在 `equipInventoryItem()` 中自动检测（`combinedEquipment()` 判断配方）。
+After one side is defeated, the game enters settlement logic, updates gold and HP, handles item drops, advances the round, and restores the preparation board.  
+<small>（当一方被击败后，游戏进入结算逻辑，更新金币和生命值，处理物品掉落，推进回合，并恢复准备阶段棋盘。）</small>
 
-**掉落**：战斗胜利后，`tryDropBasicEquipment()` 以 30% 概率从 11 种基础装备中随机掉落 1 件到装备栏（装备栏满 8 件时不触发）。
+### Unit State Machine
+<small>（单位状态机）</small>
 
-**穿戴限制**：每单位装备容量 = 星级（1 星 1 件，2 星 2 件，3 星 3 件，`equipmentCapacity()`）。
+Each combat unit is controlled by a finite-state machine:  
+<small>（每个战斗单位都由一个有限状态机控制：）</small>
 
-### 4.11 存档与读档
+| State | Meaning |
+|---|---|
+| Idle | Waiting, stunned, cooling down, or without a valid action |
+| Moving | Moving toward a target |
+| Attacking | Performing a normal attack |
+| Casting | Casting a skill |
+| Dead | Unit has died and will be removed |
 
-**存档**（`saveGame()`，`game.cpp:350`）：将完整游戏状态序列化为 JSON 对象，写入文件。保存字段包括 `version`、`phase`、`gameOver`、`player`/`enemy` 完整数据、`shop`/`enemyShop` 槽位、`equipmentInventory`、所有单位完整快照（属性、位置、owner、装备、状态等）。
+<small>（状态含义：Idle 表示等待、眩晕、冷却中或没有合法行动；Moving 表示向目标移动；Attacking 表示进行普通攻击；Casting 表示释放技能；Dead 表示单位已经死亡并将被移除。）</small>
 
-**读档**（`loadGame()`，`game.cpp:548`）：解析 JSON 文件，重建 Player、Board、Bench、Unit、装备库存等全部状态，重新创建 GUI 图形项，调用 `syncFromState()` 刷新界面。存档文件格式为 `.json`。
+The combat tick checks unit conditions in priority order:  
+<small>（战斗 tick 会按照优先级顺序检查单位状态：）</small>
 
+1. Dead check  
+   <small>（死亡检查）</small>
 
-## 5. 辅助函数说明
+2. Stun check  
+   <small>（眩晕检查）</small>
 
-以下为项目中的重要辅助函数，按功能分类说明：
+3. Cooldown check  
+   <small>（冷却检查）</small>
 
-**羁绊与文本转换**：
-- `originToText()` / `roleToText()`：将 `Origin` / `Role` 枚举值转为中英文显示文本。
-- `heroLocalizedName()`：将英雄英文名（如 "Jarvan IV"）转为中文名。
-- `equipmentShortName()` / `equipmentName()` / `equipmentStatText()`：返回装备的简称/全称/属性描述。
+4. Skill casting check  
+   <small>（技能释放检查）</small>
 
-**UI 文本生成**（`src/gui/`）：
-- `shopStatsText()`：生成商店卡牌中单位参数的 HTML 富文本。
-- `unitStatsText()`：生成右键详情卡中完整属性的 HTML 富文本。
-- `skillText()` / `unitSkillText()`：拆分技能名和技能描述正文。
+5. Attack range check  
+   <small>（攻击范围检查）</small>
 
-**坐标转换**（`src/core/game.cpp`）：
-- `gridToWorld()`：将棋盘逻辑坐标 (row, col) 转换为场景像素坐标。
-- `worldToGrid()`：将场景像素坐标转换为最近棋盘格子坐标。
-- `benchSlotRect()` / `benchSlotCenter()`：计算备战区槽位的矩形区域和中心像素坐标。
-- `findBenchSlot()`：根据鼠标场景坐标判断落在哪个备战区槽位。
+6. Movement check  
+   <small>（移动检查）</small>
 
-**单位管理**（`src/core/game.cpp`）：
-- `removeUnitCompletely()`：从棋盘、备战区、图形 item 列表、单位列表中彻底删除一个单位。
-- `findMergeCandidates()`：查找与指定单位同名同星级的候选，用于升星合并。
-- `cloneUnitForCombat()`：深拷贝一个单位，用于创建战斗副本。
+This structure keeps combat behavior predictable and avoids mixing movement, attack, and skill logic in a single uncontrolled flow.  
+<small>（这种结构使战斗行为更加可预测，并避免将移动、攻击和技能逻辑混杂在一个不可控流程中。）</small>
 
-**装备相关**（`src/core/game.cpp`）：
-- `tryDropBasicEquipment()`：胜利结算时以 30% 概率随机掉落 1 件基础装备。
-- `applyEquipmentStats()`：将装备的属性加成应用到单位的对应字段。
-- `combinedEquipment()`：判断两件散件是否满足合成配方，返回合成的成装类型。
+## Pathfinding
+<small>（寻路系统）</small>
 
-**战斗辅助**（`src/core/game.cpp`）：
-- `setupCombatCopies()` / `restorePreparationBoard()`：进入/退出战斗时创建/销毁战斗副本并恢复备战阵容。
-- `starredValue()`：根据星级（1-3）从三元素数组中取出对应值，用于技能伤害/治疗/护盾的星级缩放。
-- `targetThreatScore()`：计算敌方单位对攻击者的威胁评分，综合距离、血量、攻击力、远程等因素。
-- `effectiveAttackSpeed()`：计算单位的实际攻击速度，考虑攻速加成和冰冷减速。
-- `updateCombatEffects()`：每 tick 递减单位的眩晕、冰冷、攻速加成、护盾持续时间等战斗效果。
+Synera uses BFS to move units across the grid.  
+<small>（Synera 使用 BFS 在网格上移动单位。）</small>
 
-**敌方 AI**（`src/core/game.cpp`）：
-- `runEnemyPrepareAgent()`：敌方准备阶段主逻辑：升级 → 部署 → 购买 → 合成 → 布阵。
-- `arrangeEnemyFormation()`：按 Frontline/Backline 类型将敌方单位排列到上半场合适位置。
-- `enemyShopSlotScore()`：对商店槽位评分，考虑费用、属性、羁绊匹配度。
+The pathfinding function searches from the unit’s current position toward a reachable cell within attack range of the target. It avoids invalid cells and occupied cells, records parent nodes during search, and moves the unit one step along the recovered path.  
+<small>（寻路函数从单位当前位置开始搜索，寻找一个位于目标攻击范围内的可达格子。它会避开非法格子和被占用格子，在搜索过程中记录父节点，并让单位沿恢复出的路径移动一步。）</small>
 
-**存档相关**（`src/core/game.cpp`）：
-- `saveGame()` / `loadGame()`：将完整游戏状态序列化为 JSON 并写入文件 / 从文件读取并恢复。
+Compared with simple greedy movement, BFS handles blocking and basic detours more reliably.  
+<small>（相比简单贪心移动，BFS 能更可靠地处理阻挡和基础绕路情况。）</small>
 
-## 6. 面向对象与多态设计
+### Simplified BFS Logic
+<small>（简化 BFS 逻辑）</small>
 
-### 6.1 统一单位模型
+1. Start from the unit's current grid position.  
+   <small>（从单位当前所在的网格位置开始。）</small>
 
-`src/entity/unit/unit.h` 定义 Unit 基类，包含所有战斗单位共有的属性（HP、ATK、法力、装备等）和行为接口（`castSkill()`）。我方单位与敌方单位使用同一 Unit 类型，仅通过 `m_owner` 字段（`Owner::PlayerCtrl` / `Owner::EnemyCtrl`）区分归属。`m_origins` 和 `m_roles` 仅用于羁绊计算，不用于敌我区分。严格遵守 PA 文档中 "owner 标记敌我归属，traits 标记羁绊标签" 的形式化要求。
+2. Push the start cell into a queue.  
+   <small>（将起点格子加入队列。）</small>
 
-### 6.2 继承体系
+3. Visit neighboring cells one layer at a time.  
+   <small>（逐层访问相邻格子。）</small>
 
-12 个英雄类均继承自 Unit，各自维护 `.h` 声明和 `.cpp` 实现文件。每个英雄类在构造函数中设置自身的基础属性，并重写虚函数 `void castSkill(Game* game, Unit* target)`。
+4. Ignore out-of-board cells and occupied cells.  
+   <small>（忽略棋盘外格子和已被占用的格子。）</small>
 
-### 6.3 虚函数与动态绑定
+5. Record each cell's parent.  
+   <small>（记录每个格子的父节点。）</small>
 
-- 基类声明：`src/entity/unit/unit.h:151` — `virtual void castSkill(Game* game, Unit* target) {}`
-- 派生类重写：如 `src/entity/heros/cost1/Jhin.cpp` 中 Jhin 实现完美谢幕；`src/entity/heros/cost3/Ahri.cpp` 中 Ahri 实现狐火。
-- 调用点：`src/core/game.cpp:2302` — `Game::castSkill(Unit* caster, Unit* target)` 中调用 `caster->castSkill(this, target)`。
-- 运行时效果：`combatTick()` 在法力满时调用 `castSkill(attacker, target)`，C++ 虚函数表根据 `attacker` 的实际类型自动分发到正确的重写版本，无需 if-else 或 switch 判断英雄类型。
+6. Stop when a reachable cell within attack range is found.  
+   <small>（当找到一个处于攻击范围内的可达格子时停止搜索。）</small>
 
-### 6.4 工厂模式
+7. Recover the path through parent records.  
+   <small>（通过父节点记录恢复路径。）</small>
 
-`Game::createUnitFromShopSlot()`（`game.cpp:1508`）使用 switch 根据 `HeroType` 枚举创建对应的英雄派生类对象，返回 `Unit*` 基类指针，保证商店/存档等模块只依赖 Unit 接口而不关心具体英雄类型。
+8. Move one step along the path.  
+   <small>（沿路径移动一步。）</small>
 
-## 7. 项目简介
+## Target Selection
+<small>（目标选择）</small>
 
-Synera 是一款单机版轻量级自走棋游戏（PvE），核心玩法分为三个阶段循环：
+Units automatically select enemies during combat. The target selection logic considers factors such as:  
+<small>（单位会在战斗中自动选择敌人。目标选择逻辑会考虑以下因素：）</small>
 
-- **准备阶段（Prep）**：玩家使用金币在商店购买英雄、刷新商店、将英雄从备战区拖拽至棋盘上阵、调整站位、穿戴装备、升级人口上限。
-- **战斗阶段（Combat）**：敌方单位根据轮次自动生成并部署于上半场。双方单位自动索敌、移动、普攻回蓝、释放技能。玩家不可操作。
-- **结算阶段（Resolve）**：战斗结束后根据胜负结算金币（含利息和连败补偿）、血量、轮次推进，30% 概率掉落基础装备。玩家或敌方血量归零则游戏结束。
+- Distance to the target  
+  <small>（到目标的距离）</small>
 
-游戏支持 JSON 格式的存档与读档，可随时保存/恢复完整游戏状态。敌方 AI 在每轮准备阶段自动进行购买、刷新、升级、出售、升星和布阵决策。
+- Current HP ratio  
+  <small>（当前生命值比例）</small>
 
-## 8. 编译与运行方式
+- Attack power  
+  <small>（攻击能力）</small>
 
-1. 使用 CLion 打开项目根目录 `Synera_Starter`。
-2. 确保本机已安装 Qt6（包含 Core、Widgets、Gui 模块）。
-3. CLion 自动识别 `CMakeLists.txt` 并加载 CMake 项目。
-4. 选择运行目标 `Synera_Starter`。
-5. 点击 Build 编译，再点击 Run 运行。
+- Whether the unit is ranged or melee  
+  <small>（该单位是远程单位还是近战单位）</small>
 
-命令行直接编译需要手动配置 Qt6 路径（`CMAKE_PREFIX_PATH`），推荐使用 CLion 避免路径配置问题。
+- Whether the enemy is currently attacking this unit  
+  <small>（敌人当前是否正在攻击该单位）</small>
 
-## 9. 游戏玩法说明
+This gives units a basic threat-aware targeting behavior instead of always attacking a purely nearest target.  
+<small>（这使单位具备基础的威胁感知目标选择行为，而不是永远只攻击最近目标。）</small>
 
-1. **启动游戏**：游戏启动后自动进入准备阶段，玩家获得初始金币 6 和 1 个随机 1 费英雄。
-2. **商店购买**：左侧商店区域显示当前可购买的英雄。点击英雄卡片扣除对应金币，英雄进入备战区。点击 "Refresh 4 gold" 按钮花费 4 金币刷新商店。
-3. **上阵**：将英雄从备战区拖拽到下方玩家半场（第 5-8 行）。拖拽到已有单位的地块上会自动交换位置。拖拽回备战区则下阵。拖拽到左下角出售区则出售单位（返还等额金币）。
-4. **开始战斗**：点击 "Start Combat" 按钮，系统自动在敌方半场生成敌人，进入战斗阶段。
-5. **自动战斗**：双方单位自动索敌、移动、普攻（回蓝）、释放技能。界面显示弹道飞行特效。
-6. **结算**：敌方全灭则玩家胜利（获得金币+利息、可能掉落装备），我方全灭则玩家失败（扣血 = 胜方存活单位数，最低 1）。进入下一轮准备阶段。
-7. **游戏结束**：任一方血量归零时游戏结束，弹出 Victory/Defeat 对话框。
-8. **其他功能**：升级人口（每次 4 金币获得进度）、右键查看单位详情、装备拖拽穿戴与合成、存档读档。
+## Economy and Shop
+<small>（经济与商店系统）</small>
 
-**商店槽位设计说明***：当前商店每次刷出 2 个英雄而非 PA 要求的 5 个。这是有意为之的设计选择——游戏共 12 名英雄，5 格商店将严重降低运营深度和筛选趣味性。如需满足 PA Checklist，将 `src/core/game.cpp:1444` 的 `kShopSlotCount` 从 2 改为 5 即可。
+The game includes a basic economy system:  
+<small>（游戏包含一个基础经济系统：）</small>
 
-## 10. PA 要求完成度对照表
+- Initial gold  
+  <small>（初始金币）</small>
 
-| PA 要求 | 完成状态 | 对应文件/类 | 验收方式 |
-|-------|-----|-------------|----------|
-| **阶段一** |     | | |
-| M×N 棋盘、玩家/敌方半场、地块占用 | 已完成 | `src/core/board.h`，ROWS=COLS=8 | 拖拽单位到不同半场测试占用 |
-| 备战区与棋盘同步 | 已完成 | `src/core/bench.h`，SLOTS=8 | 拖拽单位在棋盘和备战区之间切换 |
-| Unit 基类（HP/ATK/Range/Mana） | 已完成 | `src/entity/unit/unit.h:91-186` | 查看单位属性面板 |
-| owner 区分敌我，traits 用于羁绊 | 已完成 | `unit.h:25-86` 枚举 Owner/Origin/Role | 敌方单位为红色，羁绊栏显示标签 |
-| Player 实体 | 已完成 | `src/core/player.h` | 状态栏显示 HP/Gold/Level |
-| 敌方轮次生成 | 已完成 | `game.cpp:3009` runEnemyPrepareAgent() | 战斗开始时敌方半场自动出现单位 |
-| 拖拽摆放与非法放置处理 | 已完成 | `game.cpp:751` handleDropCommand()，含交换/回弹/出售区 | 拖拽到非法位置自动弹回或交换 |
-| GUI 展示棋盘/备战区/单位信息 | 已完成 | `src/gui/gamewindow.cpp` | 界面展示血条、蓝条、属性面板 |
-| **阶段二** |     | | |
-| Prep/Combat/Resolve 三阶段循环 | 已完成 | `game.cpp` startCombat()/combatTick()/finishCombat() | 点击 Start Combat → 战斗 → 自动结算 |
-| 敌方单位按轮次生成并增强 | 已完成 | `game.cpp` runEnemyPrepareAgent() + advanceRound() | 观察多轮后敌方阵容变化 |
-| Unit 状态机 | 已完成 | `unit.h:8` UnitState + `game.cpp:2471` combatTick() | 战斗中观察单位状态切换 |
-| 索敌规则（距离+平局优先级） | 已完成 | `game.cpp` findNearestEnemy() + targetThreatScore() | 观察单位选择攻击目标的行为 |
-| BFS 寻路、阻挡、防重叠 | 已完成 | `game.cpp:2695` moveUnitTowardTarget() | 单位绕过阻挡到达目标 |
-| 普攻、回蓝 | 已完成 | `game.cpp` performAttack()，每普攻+10 法力 | 观察蓝条增长 |
-| 多态技能（3-5 英雄） | 已完成 | 12 个英雄类，`src/entity/heros/` | 战斗中观察不同英雄释放不同技能 |
-| 胜负结算 | 已完成 | `game.cpp:2535` finishCombat() | 一方全灭后自动结算 |
-| **阶段三** |     | | |
-| 金币系统 | 已完成 | `player.h` + 利息/连败补偿 | 状态栏显示金币变化 |
-| 商店招募位 | 已完成 | `game.cpp:1444` kShopSlotCount=2 | 改为 5 即可满足要求 |
-| 购买、刷新、备战区落位 | 已完成 | `game.cpp:1477` buyShopUnit() | 点击商店卡片→单位进入备战区 |
-| 人口上限与升级 | 已完成 | `player.cpp` buyLevelProgress()，unitCap()=level | 点击 Upgrade Level 升级 |
-| 4-6 种羁绊 | 已完成 | 6 种：3 Origin + 3 Role | 羁绊状态栏显示激活信息 |
-| ≥2 种属性光环类羁绊 | 已完成 | 德玛西亚(HP)、艾欧尼亚(攻速)、弗雷尔卓德(双抗)、枪手(ATK) | 查看激活时的属性变化 |
-| ≥1 种机制改变类羁绊 | 已完成 | 护卫(护盾)、神盾使(护盾) | 查看激活时的护盾效果 |
-| 升星 3 合 1 | 已完成 | `game.cpp:1611` tryMergeUnit() | 购买第 3 个同名单位自动合并 |
-| 2 星属性提升 | 已完成 | HP×2, ATK×2, 护甲×2 | 查看 2 星单位面板 |
-| 装备掉落 | 已完成 | `game.cpp` tryDropBasicEquipment()，30% 概率 | 胜利后有概率掉落 |
-| 装备穿戴限制 | 已完成 | 容量=星级，equipmentCapacity() | 拖拽装备到单位穿戴 |
-| ≥4 种基础装备 | 已完成 | 11 种基础 + 4 种成装 = 15 种 | 查看装备栏和单位面板 |
-| 存档读档 | 已完成 | `game.cpp:350` saveGame() / loadGame()，JSON 格式 | 保存后重开游戏读档验证 |
-| GUI 展示经济/商店/羁绊/星级/轮次/阶段 | 已完成 | `gamewindow.cpp` 状态栏+商店卡片+详情卡 | 界面各项信息完整可读 |
-| **阶段四** |     | | |
-| 利息机制 | 已完成 | `game.cpp:195` interestForGold()，每 10 金+1，上限 5 | 金币 ≥10 时结算显示额外 +1 |
-| 连败补偿 | 已完成 | `game.cpp:181` lossStreakCompensation() | 连败后结算金币增加 |
-| 装备合成树 | 已完成 | `game.cpp` combinedEquipment()，4 种成装 | 穿戴两件配方散件自动合成 |
-| 弹道特效 | 已完成 | `game.cpp` showAttackProjectile() / updateAttackProjectiles() | 战斗中显示攻击飞行弹道 |
-| 智能索敌 | 已完成 | `game.cpp` targetThreatScore() 多维度评分 | 观察单位优先攻击高威胁目标 |
+- Round rewards  
+  <small>（回合奖励）</small>
 
+- Shop refresh cost  
+  <small>（商店刷新费用）</small>
 
-## 11. AI 使用说明
+- Unit purchase cost  
+  <small>（单位购买费用）</small>
 
-### 11.1 AI 辅助范围与具体贡献
+- Level upgrade cost  
+  <small>（等级升级费用）</small>
 
-本项目使用 Codex CLI 进行辅助开发。大部分代码由本人完成，交由 Codex 进行验收，以确保代码的正确性。一部分功能的实现由 Codex 完成。
+- Population limit based on player level  
+  <small>（基于玩家等级的人口上限）</small>
 
-以下按模块说明 AI 的具体贡献：
+- Interest reward based on current gold  
+  <small>（基于当前金币数量的利息奖励）</small>
 
-**项目架构与模块拆分**：
-- AI 将 PA 需求分解为 14 个可执行子任务：棋盘渲染 → Bench 槽位 → 拖拽交互 → 单位基类 → Player 经济 → 商店购买/刷新 → 人口升级 → 战斗状态机 → 索敌 → BFS 寻路 → 技能多态（12 英雄） → 羁绊计算 → 升星合并 → 装备掉落/穿戴/合成 → JSON 存档
-- 本人按此顺序逐模块实现，每完成一个模块后运行验证。
+- Loss-streak compensation  
+  <small>（连败补偿）</small>
 
-**棋盘与 GUI 层**：
-- `src/gui/gamewindow.cpp`（1226 行）：AI 辅助生成了商店卡片 HTML 富文本布局、装备图谱对话框的网格排列、状态栏样式
+The shop randomly offers purchasable heroes from the unit pool. Purchased units are placed into the bench if space is available.  
+<small>（商店会从单位池中随机提供可购买英雄。如果备战区有空位，购买的单位会被放入备战区。）</small>
 
-**战斗系统**：
-- `combatTick()`（`game.cpp:2498`）：AI 提供了按优先级检查状态机的循环框架（Dead → Stunned → Cooldown → Casting → Attacking → Moving），本人手动填充了每个分支的冷却时间计算和 `setState()` 调用
-- `performAttack()`（`game.cpp:2357`）：AI 生成基础普攻逻辑
-- `updateCombatEffects()`（`game.cpp:2426`）：AI 生成 stun/chill/attackSpeed 的逐 tick 递减框架。**本人发现并修复了关键 bug**：护盾（`shield`）没有任何过期机制，导致 Loris/Sejuani 等英雄获得永久护盾。本人新增了 `shieldSeconds` 字段到 `CombatUnitState`（`game.h:96`），在 `updateCombatEffects()` 中添加 `if (shield > 0 && shieldSeconds > 0.0)` 衰减逻辑（`game.cpp:2439-2443`），并在 4 个护盾英雄的 `castSkill()` 中设置 `shieldSeconds = 4.0`
-- `cloneUnitForCombat()`（`game.cpp:1906`）：**本人发现并修复了致命 bug**——AI 生成的代码使用 `new Unit(name)` 创建裸基类对象，导致战斗副本的 `castSkill()` 虚函数分发落到基类空实现上，所有英雄技能在战斗中完全不生效（蓝条不扣、伤害不触发）。本人将其改为 `switch (heroType)` 创建对应派生类（`new Loris()` 等），使虚函数表正确指向各英雄的 `castSkill()` 重写
+## Synergy System
+<small>（羁绊系统）</small>
 
-**敌方 AI**：
-- `runEnemyPrepareAgent()`（`game.cpp:3036`）：AI 提供"升级 → 部署 → 购买 → 布阵"的主循环结构。本人添加了 5 轮购买 `pass` 循环、金币阈值判断（`gold >= 24` 才升级）、以及 `enemyShopSlotScore()` 评分函数的具体权重
-- `enemyShopSlotScore()`（`game.cpp:2835`）：评分公式 `cost*100 + star*250 + maxHp/10 + atk` + 同名单位合并奖励（2 个匹配 +180，3 个匹配 +1000），本人设计了权重系数以平衡 AI 的购买倾向
+Units have origin and role tags. When multiple units with matching tags are deployed, synergy effects are activated.  
+<small>（单位拥有起源标签和职业标签。当多个拥有相同标签的单位被部署时，对应羁绊效果会被激活。）</small>
 
-**装备系统**：
-- `equipInventoryItem()`（`game.cpp:1744`）：AI 生成穿戴逻辑框架，本人添加了散件合成检测（遍历已穿装备 → 调用 `combinedEquipment()` → 替换标识）和装备容量检查（`equipmentCapacity() = star`）
+Implemented synergy types include both stat-based bonuses and shield-style mechanics, such as:  
+<small>（已实现的羁绊类型包括属性加成和护盾类机制，例如：）</small>
 
-**JSON 存档**：
-- `saveGame()`（`game.cpp:350`）：AI 生成 JSON 序列化模板，将 `Player`、商店、装备库存、所有单位属性（含 `CombatUnitState` 的 `shield`/`stunSeconds`/`chillSeconds`/`attackSpeedBonus`/`empoweredShots`/`basicAttackCount`/`skillCastCount`/`shieldSeconds`）写入文件
+- HP bonus  
+  <small>（生命值加成）</small>
 
+- Attack speed bonus  
+  <small>（攻击速度加成）</small>
 
+- Armor and magic resistance bonus  
+  <small>（护甲与魔法抗性加成）</small>
 
-### 11.2 核心模块解释一：BFS 寻路
+- Attack damage bonus  
+  <small>（攻击力加成）</small>
 
-**代码位置**：`src/core/game.cpp:2721-2796`，`Game::moveUnitTowardTarget()`
+- Shield effects  
+  <small>（护盾效果）</small>
 
-BFS（广度优先搜索）用于在棋盘网格上找到从单位当前位置到目标攻击范围内最近可达格子的最短路径，替代早期版本中的贪心直线移动。
+Synergy effects are applied to combat copies during combat preparation so that the player’s original preparation board state remains stable.  
+<small>（羁绊效果会在战斗准备阶段应用到战斗副本上，从而保持玩家原始准备棋盘状态稳定不变。）</small>
 
-**数据结构**：
-- `std::deque<QPoint> queue`：BFS 搜索队列，`push_back` 入队，`pop_front` 出队
-- `std::unordered_map<int, QPoint> parent`：前驱节点哈希表，key 为 `x*100+y` 将二维坐标压为一维索引，value 为到达该格子的上一步坐标
-- `static const std::array<QPoint, 6> kDirections`：6 个搜索方向（上下左右 + 右下/左上两个对角）
+## Star Upgrade System
+<small>（升星系统）</small>
 
-**搜索流程**：
-1. 起点入队，`parent[start] = start` 标记已访问
-2. 循环出队当前节点 `cur`，计算 `cur` 到目标 `targetPos` 的距离平方 `distSq`
-3. 若 `distSq ≤ attackRange²` 且比当前最佳 `bestDistSq` 更近：记录 `bestGoal = cur`，标记 `found = true`，继续同层搜索（不立即停止，因为同层可能有更优目标）
-4. 若 `found && distSq ≥ bestDistSq`：当前层已无更优解，跳过扩展（剪枝优化）
-5. 否则对 6 个方向的相邻格子：跳过越界（`!isValidPosition`）、跳过被占（`hasUnitAt && != start`）、跳过已访问（`parent.count`）；合法格子设置前驱并入队
-6. 队列空后，若 `found && bestGoal != start`：沿 `parent` 回溯 `while (parent[step] != start) step = parent[step]`，`step` 即为第一步移动目标
-7. `m_board.removeUnit(unit)` → `m_board.addUnit(unit, step)` → `syncFromState()` 完成一步移动
+The project implements a three-unit merge system.  
+<small>（本项目实现了三合一升星系统。）</small>
 
-**算法特性**：BFS 从起点逐层向外扩展，天然保证找到的是最短路径（按步数）。当所有方向均被阻挡时 `bestGoal == start`，函数直接 return 不移动。
+When the player owns at least three units with the same name and star level, the game merges them into one higher-star unit. The upgraded unit receives improved attributes such as increased HP and attack damage.  
+<small>（当玩家拥有至少三个名称和星级都相同的单位时，游戏会将它们合成为一个更高星级单位。升星后的单位会获得更高属性，例如更多生命值和攻击力。）</small>
 
-### 11.3 核心模块解释二：技能多态与动态绑定
+The merge system checks both the board and the bench.  
+<small>（合成系统会同时检查棋盘和备战区。）</small>
 
-**代码位置**：
-- 基类虚函数声明：`src/entity/unit/unit.h:151` — `virtual void castSkill(Game* game, Unit* target) {}`
-- 多态调用点：`src/core/game.cpp:2330` — `caster->castSkill(this, target);`
-- 派生类示例：`src/entity/heros/cost3/Ahri.cpp:32-41`、`src/entity/heros/cost1/Jhin.cpp:32-36`
+## Equipment System
+<small>（装备系统）</small>
 
-**设计原理**：本项目使用 C++ 虚函数机制实现技能多态。Unit 基类声明 `virtual void castSkill(Game*, Unit*)`，提供默认空实现 `{}`。12 个英雄派生类各自重写此函数。
+The game includes an equipment inventory and item wearing system.  
+<small>（游戏包含装备背包和装备穿戴系统。）</small>
 
-**运行时流程**：
-1. `combatTick()` 检测 `attacker->mana() >= attacker->maxMana()`，调用 `castSkill(attacker, target)`
-2. `Game::castSkill()`（`game.cpp:2323`）调用 `caster->castSkill(this, target)` — 注意参数是 `Unit* caster`（基类指针）
-3. C++ 运行时通过虚函数表（vtable）查找 `caster` 实际指向对象的类型。若 `caster` 实际是 `Ahri*`，则跳转到 `Ahri::castSkill()`；若实际是 `Loris*`，则跳转到 `Loris::castSkill()`
-4. 各派生类的实现完全不同：Ahri 对 3 个附近敌人造成魔法伤害（`skillAreaTargets(target, enemyOwner, 3)` → `dealDamage({82,125,225})`），Loris 获得 4 秒护盾 + 对目标 1.25 秒晕眩 + 魔法伤害（`shield += {700,800,1000}` + `shieldSeconds = 4.0` + `stunSeconds = 1.25` + `dealDamage({150,225,360})`）
+Units can equip items, and equipment capacity depends on star level. The equipment system supports both basic item stat bonuses and synthesized items.  
+<small>（单位可以穿戴装备，装备容量取决于星级。装备系统同时支持基础装备属性加成和合成装备。）</small>
 
-### 11.4 核心模块解释三：战斗状态机与 combatTick
+Example item effects include:  
+<small>（示例装备效果包括：）</small>
 
-**代码位置**：`src/entity/unit/unit.h:8`（`UnitState` 枚举）+ `src/core/game.cpp:2498`（`combatTick()`）
+- Attack damage bonus  
+  <small>（攻击力加成）</small>
 
-战斗循环通过 `QTimer` 每 200ms 触发一次 `combatTick()`。该函数对双方所有存活单位执行统一的状态机推进。
+- Attack speed bonus  
+  <small>（攻击速度加成）</small>
 
-**状态定义与转换**（`unit.h:8-14`）：
-- `Idle`：空闲 — 被眩晕、冷却中、无目标时的默认状态
-- `Moving`：移动 — 有目标但超出攻击范围，调用 `moveUnitTowardTarget()` 执行 BFS 寻路一步
-- `Attacking`：攻击 — 目标进入攻击范围，调用 `performAttack()` 造成伤害并回蓝
-- `Casting`：施法 — 法力满，调用 `castSkill()` 释放技能，冷却 = `1.0/effectiveAttackSpeed()`
-- `Dead`：死亡 — HP ≤ 0，下一 tick 由 `removeDeadUnits()` 清理
+- Armor bonus  
+  <small>（护甲加成）</small>
 
-**combatTick() 执行流程**（`game.cpp:2498-2555`）：
-1. `updateCombatEffects()`：递减所有单位的 `stunSeconds`/`chillSeconds`/`attackSpeedBonusSeconds`/`shieldSeconds`（过期清零）
-2. 遍历 `deployedUnits(PlayerCtrl) + deployedUnits(EnemyCtrl)` 的并集
-3. 对每个 `attacker` 按优先级检查：
-   - HP ≤ 0 → `setState(Dead)`，`continue`
-   - `stunSeconds > 0` → `setState(Idle)`，`continue`（眩晕期间不行动）
-   - `cooldown > 0` → `setState(Idle)`，递减冷却，`continue`
-   - `mana >= maxMana && maxMana > 0` → `setState(Casting)` → `castSkill()` → 冷却 = `1.0 / effectiveAttackSpeed()`
-   - `isInAttackRange(target)` → `setState(Attacking)` → `performAttack()` → 冷却 = `1.0 / effectiveAttackSpeed()`
-   - 否则 → `setState(Moving)` → `moveUnitTowardTarget()` → 冷却 = `300ms`
-4. `updateWarmogsHealing()`：狂徒铠甲回血（脱离战斗 3 秒后每秒 5% 最大 HP）
-5. `removeDeadUnits()`：移除 HP ≤ 0 的单位
-6. 检测战斗结束：任一方场上无存活单位 → `finishCombat()`
+- Magic resistance bonus  
+  <small>（魔法抗性加成）</small>
 
-## 12. 已知问题与后续改进
+- HP bonus  
+  <small>（生命值加成）</small>
 
-- **商店槽位**：当前为 2 格而非 PA 要求的 5 格。设计理由见第 9 节。如需通过 Checklist 验收，将 `src/core/game.cpp:1444` 的 `kShopSlotCount` 改为 5 即可。
-- **GUI 美术资源**：当前使用简单纯色方块 + 文字标注，未使用精细像素素材。
-- **平衡性**：英雄数值和羁绊效果未经过系统性平衡测试。（不过参数都是照抄金铲铲的）
-- **BFS 寻路**：对极端拥堵场景可能无路可走，当前原地等待。
-- **敌方 AI**：使用基于分数的贪心策略，后续可以改为使用 MinMax 等搜索算法。
-- **音效**：未添加背景音乐或攻击/技能音效。
+- Mana-related effects  
+  <small>（法力值相关效果）</small>
 
+- Critical rate bonus  
+  <small>（暴击率加成）</small>
+
+The game also supports several item combinations that synthesize stronger equipment with additional passive effects.  
+<small>（游戏还支持若干装备组合，可以合成带有额外被动效果的更强装备。）</small>
+
+## Save and Load
+<small>（存档与读档）</small>
+
+The game state can be saved to and loaded from a JSON file.  
+<small>（游戏状态可以保存到 JSON 文件，也可以从 JSON 文件读取。）</small>
+
+The save system records information such as:  
+<small>（存档系统会记录以下信息：）</small>
+
+- Game phase  
+  <small>（游戏阶段）</small>
+
+- Player state  
+  <small>（玩家状态）</small>
+
+- Enemy state  
+  <small>（敌方状态）</small>
+
+- Shop slots  
+  <small>（商店槽位）</small>
+
+- Equipment inventory  
+  <small>（装备背包）</small>
+
+- Unit attributes  
+  <small>（单位属性）</small>
+
+- Unit positions  
+  <small>（单位位置）</small>
+
+- Unit ownership  
+  <small>（单位归属）</small>
+
+- Unit star levels  
+  <small>（单位星级）</small>
+
+- Unit equipment  
+  <small>（单位装备）</small>
+
+- Combat-related temporary states  
+  <small>（战斗相关临时状态）</small>
+
+Loading reconstructs the game state and refreshes the GUI accordingly.  
+<small>（读档会重建游戏状态，并相应刷新图形界面。）</small>
+
+## Build and Run
+<small>（构建与运行）</small>
+
+### Recommended: CLion
+<small>（推荐方式：CLion）</small>
+
+1. Install Qt6.  
+   <small>（安装 Qt6。）</small>
+
+2. Open the project root directory in CLion.  
+   <small>（在 CLion 中打开项目根目录。）</small>
+
+3. Let CLion load the CMake project.  
+   <small>（让 CLion 加载 CMake 项目。）</small>
+
+4. Select the Synera_Starter target.  
+   <small>（选择 Synera_Starter 构建目标。）</small>
+
+5. Click Build.  
+   <small>（点击 Build 进行构建。）</small>
+
+6. Click Run.  
+   <small>（点击 Run 运行程序。）</small>
+
+### Command Line
+<small>（命令行方式）</small>
+
+Command-line build may require manually setting the Qt6 path through CMAKE_PREFIX_PATH.  
+<small>（命令行构建可能需要通过 CMAKE_PREFIX_PATH 手动设置 Qt6 路径。）</small>
+
+Example:  
+<small>（示例：）</small>
+
+```bash
+cmake -S . -B build -DCMAKE_PREFIX_PATH=/path/to/Qt/6.x.x/macos
+cmake --build build
+```
+
+The exact Qt path depends on the local installation.  
+<small>（具体 Qt 路径取决于本地安装位置。）</small>
+
+## How to Play
+<small>（玩法说明）</small>
+
+1. Start the game.  
+   <small>（启动游戏。）</small>
+
+2. Buy units from the shop.  
+   <small>（从商店购买单位。）</small>
+
+3. Drag units from the bench to the player side of the board.  
+   <small>（将单位从备战区拖拽到玩家侧棋盘。）</small>
+
+4. Equip items if available.  
+   <small>（如果有装备，可以给单位穿戴装备。）</small>
+
+5. Upgrade level if enough gold is available.  
+   <small>（如果金币足够，可以升级等级。）</small>
+
+6. Start combat.  
+   <small>（开始战斗。）</small>
+
+7. Watch units automatically move, attack, gain mana, and cast skills.  
+   <small>（观察单位自动移动、攻击、获得法力值并释放技能。）</small>
+
+8. After combat ends, collect rewards and continue to the next round.  
+   <small>（战斗结束后领取奖励，并进入下一回合。）</small>
+
+9. Save or load the game when needed.  
+   <small>（需要时可以保存或读取游戏。）</small>
+
+## Screenshots
+<small>（截图）</small>
+
+Screenshots or demo GIFs can be added here.  
+<small>（可以在这里添加截图或演示 GIF。）</small>
+
+```text
+assets/screenshots/
+```
+
+Suggested screenshots:  
+<small>（建议添加的截图：）</small>
+
+- Main game window  
+  <small>（主游戏窗口）</small>
+
+- Shop and bench  
+  <small>（商店和备战区）</small>
+
+- Combat scene  
+  <small>（战斗场景）</small>
+
+- Equipment inventory  
+  <small>（装备背包）</small>
+
+- Unit detail panel  
+  <small>（单位详情面板）</small>
+
+- Save/load interface  
+  <small>（存档 / 读档界面）</small>
+
+## Current Limitations
+<small>（当前局限）</small>
+
+- The current visual style is simple and mainly uses basic shapes and text labels.  
+  <small>（当前视觉风格较为简单，主要使用基础图形和文字标签。）</small>
+
+- Combat balance still needs more systematic testing.  
+  <small>（战斗平衡性仍需要更系统的测试。）</small>
+
+- BFS handles normal blocking cases but may wait in extreme congestion.  
+  <small>（BFS 可以处理普通阻挡情况，但在极端拥堵时可能会出现等待。）</small>
+
+- Enemy preparation logic is heuristic-based rather than search-based.  
+  <small>（敌方准备逻辑基于启发式规则，而不是基于搜索算法。）</small>
+
+- Audio effects and background music are not included yet.  
+  <small>（目前尚未加入音效和背景音乐。）</small>
+
+- The project is primarily developed and tested on macOS with CLion and Qt6.  
+  <small>（本项目主要在 macOS、CLion 和 Qt6 环境下开发与测试。）</small>
+
+## Development Notes
+<small>（开发说明）</small>
+
+This project started from a Qt-based starter framework and was extended into a more complete auto-battler prototype. The main development focus was not visual polish, but system design:  
+<small>（本项目从一个基于 Qt 的初始框架出发，扩展为一个较完整的自走棋原型。主要开发重点不是视觉美化，而是系统设计：）</small>
+
+- clear object ownership  
+  <small>（清晰的对象所有权）</small>
+
+- maintainable unit and hero hierarchy  
+  <small>（可维护的单位与英雄类层次结构）</small>
+
+- virtual dispatch for skills  
+  <small>（技能的虚函数动态分派）</small>
+
+- structured combat state transitions  
+  <small>（结构化的战斗状态转换）</small>
+
+- grid-based movement and collision handling  
+  <small>（基于网格的移动与碰撞处理）</small>
+
+- serializable game state  
+  <small>（可序列化的游戏状态）</small>
+
+## Author
+<small>（作者）</small>
+
+Eurus  
+<small>（欧若斯）</small>
+
+Undergraduate student at Nanjing University, majoring in Intelligent Science and Technology.  
+<small>（南京大学智能科学与技术专业本科生。）</small>
+
+Interested in artificial intelligence, game agents, algorithmic problem solving, and reliable software system design.  
+<small>（兴趣方向包括人工智能、游戏智能体、算法问题求解和可靠软件系统设计。）</small>
