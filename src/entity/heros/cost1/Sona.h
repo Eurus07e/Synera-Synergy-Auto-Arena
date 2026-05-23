@@ -11,7 +11,7 @@ class Sona : public Unit
 {
 public:
     Sona();
-    void castSkill() override;
+    void castSkill(Game* game, Unit* target) override;
 };
 
 #endif // SYNERA_STARTER_SONA_H

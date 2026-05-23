@@ -11,7 +11,7 @@ class Ahri : public Unit
 {
 public:
     Ahri();
-    void castSkill() override;
+    void castSkill(Game* game, Unit* target) override;
 };
 
 

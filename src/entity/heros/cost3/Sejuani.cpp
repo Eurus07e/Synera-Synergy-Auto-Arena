@@ -3,6 +3,7 @@
 //
 
 #include "Sejuani.h"
+#include "core/game.h"
 
 Sejuani::Sejuani()
     : Unit("Sejuani")
@@ -25,14 +26,21 @@ Sejuani::Sejuani()
     m_state = UnitState::Idle;
 }
 
-void Sejuani::castSkill()
+void Sejuani::castSkill(Game* game, Unit* target)
 {
-    // 凛冬之怒：
-    // 获得持续4秒的护盾。
-    // 打击一个锥形和一条直线。
-    // 被命中的敌人受到魔法伤害和持续4秒的30%冰冷。
-    // 如果目标已被冰冷，则晕眩1秒。
-    // 冰冷：降低攻击速度。
-    // 护盾：525/575/775。
-    // 伤害：70/105/170。
+    CombatUnitState& casterState = game->combatState(this);
+    ++casterState.skillCastCount;
+    setMana(0);
+    const int star = this->star();
+    const Owner enemyOwner = target->owner();
+    const QList<Unit*> area = game->skillAreaTargets(target, enemyOwner, 0);
+    casterState.shield += game->starredValue({525, 575, 775}, star);
+    const bool previouslyChilled = game->combatState(target).chillSeconds > 0.0;
+    for (Unit* enemy : area) {
+        game->dealDamage(enemy, game->starredValue({70, 105, 170}, star));
+        game->combatState(enemy).chillSeconds = 4.0;
+    }
+    if (previouslyChilled) {
+        game->combatState(target).stunSeconds = 1.0;
+    }
 }

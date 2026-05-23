@@ -3,6 +3,7 @@
 //
 
 #include "JarvanIV.h"
+#include "core/game.h"
 
 JarvanIV::JarvanIV()
     : Unit("Jarvan IV")
@@ -25,11 +26,17 @@ JarvanIV::JarvanIV()
     m_state = UnitState::Idle;
 }
 
-void JarvanIV::castSkill()
+void JarvanIV::castSkill(Game* game, Unit* target)
 {
-    // 德邦军旗：
-    // 获得持续4秒的护盾。
-    // 给全场友军增加持续4秒的攻速。
-    // 护盾值：350/425/500。
-    // 攻击速度加成：20%/25%/50%。
+    CombatUnitState& casterState = game->combatState(this);
+    ++casterState.skillCastCount;
+    setMana(0);
+    const int star = this->star();
+    casterState.shield += game->starredValue({350, 425, 500}, star);
+    const double multiplier = star == 1 ? 1.20 : star == 2 ? 1.25 : 1.50;
+    for (Unit* ally : game->deployedUnits(owner())) {
+        CombatUnitState& state = game->combatState(ally);
+        state.attackSpeedBonusMultiplier = qMax(state.attackSpeedBonusMultiplier, multiplier);
+        state.attackSpeedBonusSeconds = 4.0;
+    }
 }

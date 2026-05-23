@@ -3,6 +3,7 @@
 //
 
 #include "Rumble.h"
+#include "core/game.h"
 
 Rumble::Rumble()
     : Unit("Rumble")
@@ -25,11 +26,16 @@ Rumble::Rumble()
     m_state = UnitState::Idle;
 }
 
-void Rumble::castSkill()
+void Rumble::castSkill(Game* game, Unit* target)
 {
-    // 机械重组：
-    // 获得持续4秒的护盾。
-    // 发射一阵火焰，在一个锥形内造成魔法伤害。
-    // 护盾：350/430/550。
-    // 伤害：72护甲加成，对应180%/270%/405%护甲。
+    CombatUnitState& casterState = game->combatState(this);
+    ++casterState.skillCastCount;
+    setMana(0);
+    const int star = this->star();
+    const Owner enemyOwner = target->owner();
+    const QList<Unit*> area = game->skillAreaTargets(target, enemyOwner, 0);
+    casterState.shield += game->starredValue({350, 430, 550}, star);
+    for (Unit* enemy : area) {
+        game->dealDamage(enemy, game->starredValue({80, 120, 180}, star));
+    }
 }

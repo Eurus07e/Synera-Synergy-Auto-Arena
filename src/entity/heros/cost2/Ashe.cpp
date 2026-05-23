@@ -3,6 +3,7 @@
 //
 
 #include "Ashe.h"
+#include "core/game.h"
 
 Ashe::Ashe()
     : Unit("Ashe")
@@ -25,20 +26,20 @@ Ashe::Ashe()
     m_state = UnitState::Idle;
 }
 
-void Ashe::castSkill()
+void Ashe::castSkill(Game* game, Unit* target)
 {
-    // 臻冰之箭：
-    // 对目标造成物理伤害，并对半径1格圆形区域内的邻格敌人造成伤害。
-    // 低于30%最大生命值的目标改为受到真实伤害。
-    // 对命中的所有敌人施加持续3秒的30%冰冷效果。
-    // 冰冷：降低攻击速度。
-    // 伤害：155 = 135物理加成 + 20法术加成。
-    // 物理加成：135/195/300。
-    // 法术加成：20/30/40。
-    // 圆形伤害：51 = 33%技能伤害。
-    //
-    // 血誓盟约：
-    // 当艾希和泰达米尔同时登场时，最强大的己方弈子会在击杀时永久提升强度。
-    // 每通过血誓盟约提供10%物理加成给泰达米尔，攻击会发射一支额外箭矢。
-    // 额外箭矢造成2物理伤害，即4%攻击力。
+    CombatUnitState& casterState = game->combatState(this);
+    ++casterState.skillCastCount;
+    setMana(0);
+    const int star = this->star();
+    const Owner enemyOwner = target->owner();
+    const QList<Unit*> area = game->skillAreaTargets(target, enemyOwner, 0);
+    game->dealDamage(target, game->starredValue({155, 225, 340}, star));
+    game->combatState(target).chillSeconds = 3.0;
+    for (Unit* enemy : area) {
+        if (enemy != target) {
+            game->dealDamage(enemy, game->starredValue({51, 74, 112}, star));
+            game->combatState(enemy).chillSeconds = 3.0;
+        }
+    }
 }

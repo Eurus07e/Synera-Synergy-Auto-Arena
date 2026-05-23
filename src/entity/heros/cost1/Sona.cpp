@@ -3,6 +3,7 @@
 //
 
 #include "Sona.h"
+#include "core/game.h"
 
 Sona::Sona()
     : Unit("Sona")
@@ -25,11 +26,22 @@ Sona::Sona()
     m_state = UnitState::Idle;
 }
 
-void Sona::castSkill()
+void Sona::castSkill(Game* game, Unit* target)
 {
-    // 能量和弦：
-    // 对2个附近的敌人造成魔法伤害。
-    // 同时为生命值最低的友军回复生命值。
-    // 伤害：130/195/300。
-    // 回复：40/50/80。
+    CombatUnitState& casterState = game->combatState(this);
+    ++casterState.skillCastCount;
+    setMana(0);
+    const int star = this->star();
+    const Owner enemyOwner = target->owner();
+    const QList<Unit*> victims = game->skillAreaTargets(target, enemyOwner, 2);
+    for (Unit* enemy : victims) {
+        game->dealDamage(enemy, game->starredValue({130, 195, 300}, star));
+    }
+    Unit* lowest = nullptr;
+    for (Unit* ally : game->deployedUnits(owner())) {
+        if (lowest == nullptr || ally->hp() < lowest->hp()) {
+            lowest = ally;
+        }
+    }
+    Game::healUnit(lowest, game->starredValue({40, 50, 80}, star));
 }

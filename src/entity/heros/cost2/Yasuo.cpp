@@ -3,6 +3,7 @@
 //
 
 #include "Yasuo.h"
+#include "core/game.h"
 
 Yasuo::Yasuo()
     : Unit("Yasuo")
@@ -25,17 +26,19 @@ Yasuo::Yasuo()
     m_state = UnitState::Idle;
 }
 
-void Yasuo::castSkill()
+void Yasuo::castSkill(Game* game, Unit* target)
 {
-    // 踏前斩：
-    // 冲刺，随后对邻格的敌人们造成物理伤害。
-    // 如果仅有一个敌人被命中，则造成双倍伤害。
-    // 伤害：103 = 95%物理加成 + 8%法术加成。
-    // 基础伤害：95/145/215。
-    // 法术加成：8/12/18。
-    //
-    // 剑刃兄弟：
-    // 当亚索和永恩同时登场时，亚索会协助永恩的技能施放。
-    // 永恩施放技能时，最强的亚索闪烁至永恩命中的每个目标，
-    // 并对每个目标造成100%攻击力物理伤害。
+    CombatUnitState& casterState = game->combatState(this);
+    ++casterState.skillCastCount;
+    setMana(0);
+    const int star = this->star();
+    const Owner enemyOwner = target->owner();
+    const QList<Unit*> area = game->skillAreaTargets(target, enemyOwner, 0);
+    if (area.size() == 1) {
+        game->dealDamage(target, game->starredValue({103, 157, 233}, star) * 2);
+    } else {
+        for (Unit* enemy : area) {
+            game->dealDamage(enemy, game->starredValue({103, 157, 233}, star));
+        }
+    }
 }

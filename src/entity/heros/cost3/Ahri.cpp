@@ -3,6 +3,7 @@
 //
 
 #include "Ahri.h"
+#include "core/game.h"
 
 Ahri::Ahri()
     : Unit("Ahri")
@@ -26,10 +27,15 @@ Ahri::Ahri()
 
 }
 
-void Ahri::castSkill()
+void Ahri::castSkill(Game* game, Unit* target)
 {
-    //向目标投出3团狐火，每团狐火造成82(【法术加成】)魔法伤害。
-    //每第3次施放，投出9团狐火，在目标和至多2名附近敌人之间分摊。
-    //如果附近有敌人，则冲刺远离。
-    //伤害：82(【法术加成】) 82/125/225
+    CombatUnitState& casterState = game->combatState(this);
+    ++casterState.skillCastCount;
+    setMana(0);
+    const int star = this->star();
+    const Owner enemyOwner = target->owner();
+    const QList<Unit*> victims = game->skillAreaTargets(target, enemyOwner, 3);
+    for (Unit* enemy : victims) {
+        game->dealDamage(enemy, game->starredValue({82, 125, 225}, star));
+    }
 }

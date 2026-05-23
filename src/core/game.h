@@ -9,6 +9,7 @@
 #include <QStringList>
 #include <QPolygonF>
 #include <QColor>
+#include <array>
 #include <unordered_map>
 #include <vector>
 #include "board.h"
@@ -145,6 +146,18 @@ public:
 
 
 
+    // Combat interface for hero skill polymorphism
+    [[nodiscard]] CombatUnitState& combatState(Unit* unit);
+    [[nodiscard]] const CombatUnitState* combatState(const Unit* unit) const;
+    void dealDamage(Unit* target, int damage);
+    static void healUnit(Unit* unit, int amount);
+    void showAttackProjectile(const Unit* attacker, const Unit* target);
+    [[nodiscard]] QList<Unit*> skillAreaTargets(const Unit* target, Owner targetOwner, int maximumTargets) const;
+    [[nodiscard]] QList<Unit*> deployedUnits(Owner owner) const;
+    void syncFromState();
+    static int starredValue(const std::array<int, 3>& values, int star);
+
+
 signals:
     void stateChanged();
     void unitCardRequested(Unit* unit);
@@ -172,7 +185,6 @@ private:
     void buildScene();
     void createUnitItem(Unit* unit);
     void createEquipmentItem(const InventoryEquipment& equipment);
-    void syncFromState();
     void syncEquipmentItems();
 
 
@@ -183,7 +195,6 @@ private:
     [[nodiscard]] QPointF benchSlotCenter(int slot, bool enemyBench) const;
     [[nodiscard]] bool isInSellZone(const QPointF& scenePos) const;
     [[nodiscard]] bool isUnitOnBoard(const Unit* unit) const;
-    [[nodiscard]]QList<Unit*> deployedUnits(Owner owner) const;
     [[nodiscard]] Unit* playerUnitAtScenePosition(const QPointF& scenePos) const;
 
     void rollShop();
@@ -202,13 +213,8 @@ private:
     [[nodiscard]] bool isInAttackRange(const Unit* attacker, const Unit* target) const;
     void performAttack(Unit* attacker, Unit* target);
     void castSkill(Unit* caster, Unit* target);
-    void dealDamage(Unit* target, int damage);
-    static void healUnit(Unit* unit, int amount);
     void updateCombatEffects();
     [[nodiscard]] double effectiveAttackSpeed(const Unit* unit) const;
-    [[nodiscard]] QList<Unit*> skillAreaTargets(const Unit* target, Owner targetOwner, int maximumTargets) const;
-    [[nodiscard]] CombatUnitState& combatState(Unit* unit);
-    [[nodiscard]] const CombatUnitState* combatState(const Unit* unit) const;
     void applyCombatSynergies();
     [[nodiscard]] QStringList computeActiveSynergies(Owner owner, const QList<Unit*>& units, bool applyBonuses);
     void updateWarmogsHealing();
@@ -234,7 +240,6 @@ private:
     bool makeRoomForEnemyShopSlot(const ShopSlot& slot);
     [[nodiscard]] QPoint preferredEnemyDeployPosition(const Unit* unit) const;
     [[nodiscard]] QPoint fallbackEnemyDeployPosition() const;
-    void showAttackProjectile(const Unit* attacker, const Unit* target);
     void updateAttackProjectiles();
     void clearAttackProjectiles();
 

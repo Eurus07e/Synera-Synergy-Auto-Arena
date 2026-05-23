@@ -3,6 +3,7 @@
 //
 
 #include "ChoGath.h"
+#include "core/game.h"
 
 ChoGath::ChoGath()
     : Unit("Cho'Gath")
@@ -25,13 +26,16 @@ ChoGath::ChoGath()
     m_state = UnitState::Idle;
 }
 
-void ChoGath::castSkill()
+void ChoGath::castSkill(Game* game, Unit* target)
 {
-    // 碎裂：
-    // 获得10永久最大生命值。
-    // 回复生命值并碎裂目标脚下半径2格的范围。
-    // 短暂延迟后，范围内敌人被击飞1.5秒并受到魔法伤害。
-    // 治疗：200/225/400。
-    // 伤害：88 = 5%生命上限 + 45法术加成。
-    // 法术加成：45/75/110。
+    CombatUnitState& casterState = game->combatState(this);
+    ++casterState.skillCastCount;
+    setMana(0);
+    const int star = this->star();
+    const Owner enemyOwner = target->owner();
+    const QList<Unit*> area = game->skillAreaTargets(target, enemyOwner, 0);
+    Game::healUnit(this, game->starredValue({200, 225, 400}, star));
+    for (Unit* enemy : area) {
+        game->dealDamage(enemy, game->starredValue({88, 118, 155}, star));
+    }
 }

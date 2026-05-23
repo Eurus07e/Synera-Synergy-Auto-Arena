@@ -84,6 +84,8 @@ enum class Role
 
 };
 
+class Game;
+
 class Unit
 {
 public:
@@ -148,7 +150,7 @@ public:
     [[nodiscard]]int equipmentCapacity() const { return m_star > 3 ? 3 : m_star; }
 
     //技能接口
-    virtual void castSkill() {}
+    virtual void castSkill(Game* game, Unit* target) {}
 
 private:
     static int s_nextId;

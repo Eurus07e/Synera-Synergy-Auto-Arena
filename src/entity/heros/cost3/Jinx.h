@@ -11,7 +11,7 @@ class Jinx : public Unit
 {
 public:
     Jinx();
-    void castSkill() override;
+    void castSkill(Game* game, Unit* target) override;
 };
 
 #endif // SYNERA_STARTER_JINX_H

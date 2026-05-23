@@ -11,7 +11,7 @@ class Sejuani : public Unit
 {
 public:
     Sejuani();
-    void castSkill() override;
+    void castSkill(Game* game, Unit* target) override;
 };
 
 #endif // SYNERA_STARTER_SEJUANI_H

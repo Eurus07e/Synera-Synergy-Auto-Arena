@@ -3,6 +3,7 @@
 //
 
 #include "Loris.h"
+#include "core/game.h"
 
 Loris::Loris()
     : Unit("Loris")
@@ -25,12 +26,13 @@ Loris::Loris()
     m_state = UnitState::Idle;
 }
 
-void Loris::castSkill()
+void Loris::castSkill(Game* game, Unit* target)
 {
-    // 皮城争斗：
-    // 获得持续4秒的护盾。
-    // 冲锋并击退目标，对目标和命中的单位造成1.25秒晕眩和魔法伤害。
-    // 冲锋后，迫使附近的敌人瞄准洛里斯。
-    // 护盾值：700/800/1000。
-    // 伤害：150/225/360。
+    CombatUnitState& casterState = game->combatState(this);
+    ++casterState.skillCastCount;
+    setMana(0);
+    const int star = this->star();
+    casterState.shield += game->starredValue({700, 800, 1000}, star);
+    game->dealDamage(target, game->starredValue({150, 225, 360}, star));
+    game->combatState(target).stunSeconds = 1.25;
 }

@@ -11,7 +11,7 @@ class Jhin : public Unit
 {
 public:
     Jhin();
-    void castSkill() override;
+    void castSkill(Game* game, Unit* target) override;
 };
 
 #endif // SYNERA_STARTER_JHIN_H

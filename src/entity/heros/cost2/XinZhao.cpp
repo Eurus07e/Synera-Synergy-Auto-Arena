@@ -3,6 +3,7 @@
 //
 
 #include "XinZhao.h"
+#include "core/game.h"
 
 XinZhao::XinZhao()
     : Unit("Xin Zhao")
@@ -25,12 +26,13 @@ XinZhao::XinZhao()
     m_state = UnitState::Idle;
 }
 
-void XinZhao::castSkill()
+void XinZhao::castSkill(Game* game, Unit* target)
 {
-    // 三重爪击：
-    // 打击目标3次。
-    // 每次打击造成物理伤害并回复生命值。
-    // 最后一击造成1.5秒晕眩。
-    // 伤害：65/100/150。
-    // 治疗：105/145/200。
+    CombatUnitState& casterState = game->combatState(this);
+    ++casterState.skillCastCount;
+    setMana(0);
+    const int star = this->star();
+    game->dealDamage(target, game->starredValue({65, 100, 150}, star) * 3);
+    Game::healUnit(this, game->starredValue({105, 145, 200}, star));
+    game->combatState(target).stunSeconds = 1.5;
 }

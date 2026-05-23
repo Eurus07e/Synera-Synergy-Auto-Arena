@@ -11,7 +11,7 @@ class JarvanIV : public Unit
 {
 public:
     JarvanIV();
-    void castSkill() override;
+    void castSkill(Game* game, Unit* target) override;
 };
 
 #endif // SYNERA_STARTER_JARVANIV_H

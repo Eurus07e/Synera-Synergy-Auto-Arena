@@ -3,6 +3,7 @@
 //
 
 #include "Jhin.h"
+#include "core/game.h"
 
 Jhin::Jhin()
     : Unit("Jhin")
@@ -25,13 +26,11 @@ Jhin::Jhin()
     m_state = UnitState::Idle;
 }
 
-void Jhin::castSkill()
+void Jhin::castSkill(Game* game, Unit* target)
 {
-    // 完美谢幕：
-    // 接下来4次普攻，攻速设为1，获得无限射程。
-    // 普攻替换为加农炮击，造成物理伤害。
-    // 第4炮额外造成144%伤害。
-    // 伤害 = 基础伤害 + 法术加成。
-    // 基础伤害：155/235/350。
-    // 法术加成：15/22/34。
+    CombatUnitState& casterState = game->combatState(this);
+    ++casterState.skillCastCount;
+    setMana(0);
+    casterState.empoweredShots = 4;
+    Q_UNUSED(target);
 }

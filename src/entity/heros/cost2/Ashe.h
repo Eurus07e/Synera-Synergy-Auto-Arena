@@ -11,7 +11,7 @@ class Ashe : public Unit
 {
 public:
     Ashe();
-    void castSkill() override;
+    void castSkill(Game* game, Unit* target) override;
 };
 
 #endif // SYNERA_STARTER_ASHE_H

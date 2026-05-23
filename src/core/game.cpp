@@ -20,6 +20,7 @@
 #include <QPen>
 #include <QSaveFile>
 #include <QTimer>
+#include <deque>
 #include <QtMath>
 #include <random>
 #include <algorithm>
@@ -215,11 +216,12 @@ bool hasRole(const Unit* unit, Role wanted)
     return std::find(roles.cbegin(), roles.cend(), wanted) != roles.cend();
 }
 
-int starredValue(const std::array<int, 3>& values, int star)
+} // end anonymous namespace
+
+int Game::starredValue(const std::array<int, 3>& values, int star)
 {
     const int index = qBound(1, star, 3) - 1;
     return values[static_cast<std::size_t>(index)];
-}
 }
 
 Game::Game(QObject* parent)
@@ -2302,107 +2304,9 @@ void Game::castSkill(Unit* caster, Unit* target)
     if (caster == nullptr || target == nullptr || caster->maxMana() <= 0) {
         return;
     }
-    CombatUnitState& casterState = combatState(caster);
-    ++casterState.skillCastCount;
-    caster->setMana(0);
-    const Owner enemyOwner = target->owner();
-    const int star = caster->star();
-    const auto hero = static_cast<HeroType>(caster->heroType());
-    const QList<Unit*> area = skillAreaTargets(target, enemyOwner, 0);
-
-    switch (hero) {
-    case HeroType::JarvanIV: {
-        casterState.shield += starredValue({350, 425, 500}, star);
-        const double multiplier = star == 1 ? 1.20 : star == 2 ? 1.25 : 1.50;
-        for (Unit* ally : deployedUnits(caster->owner())) {
-            CombatUnitState& state = combatState(ally);
-            state.attackSpeedBonusMultiplier = qMax(state.attackSpeedBonusMultiplier, multiplier);
-            state.attackSpeedBonusSeconds = 4.0;
-        }
-        break;
-    }
-    case HeroType::Jhin:
-        casterState.empoweredShots = 4;
-        break;
-    case HeroType::Rumble:
-        casterState.shield += starredValue({350, 430, 550}, star);
-        for (Unit* enemy : area) {
-            dealDamage(enemy, starredValue({80, 120, 180}, star));
-        }
-        break;
-    case HeroType::Sona: {
-        const QList<Unit*> victims = skillAreaTargets(target, enemyOwner, 2);
-        for (Unit* enemy : victims) {
-            dealDamage(enemy, starredValue({130, 195, 300}, star));
-        }
-        Unit* lowest = nullptr;
-        for (Unit* ally : deployedUnits(caster->owner())) {
-            if (lowest == nullptr || ally->hp() < lowest->hp()) {
-                lowest = ally;
-            }
-        }
-        healUnit(lowest, starredValue({40, 50, 80}, star));
-        break;
-    }
-    case HeroType::Ashe:
-        dealDamage(target, starredValue({155, 225, 340}, star));
-        combatState(target).chillSeconds = 3.0;
-        for (Unit* enemy : area) {
-            if (enemy != target) {
-                dealDamage(enemy, starredValue({51, 74, 112}, star));
-                combatState(enemy).chillSeconds = 3.0;
-            }
-        }
-        break;
-    case HeroType::ChoGath:
-        healUnit(caster, starredValue({200, 225, 400}, star));
-        for (Unit* enemy : area) {
-            dealDamage(enemy, starredValue({88, 118, 155}, star));
-        }
-        break;
-    case HeroType::XinZhao:
-        dealDamage(target, starredValue({65, 100, 150}, star) * 3);
-        healUnit(caster, starredValue({105, 145, 200}, star));
-        combatState(target).stunSeconds = 1.5;
-        break;
-    case HeroType::Yasuo:
-        if (area.size() == 1) {
-            dealDamage(target, starredValue({103, 157, 233}, star) * 2);
-        } else {
-            for (Unit* enemy : area) {
-                dealDamage(enemy, starredValue({103, 157, 233}, star));
-            }
-        }
-        break;
-    case HeroType::Ahri: {
-        const QList<Unit*> victims = skillAreaTargets(target, enemyOwner, 3);
-        for (Unit* enemy : victims) {
-            dealDamage(enemy, starredValue({82, 125, 225}, star));
-        }
-        break;
-    }
-    case HeroType::Jinx:
-        break;
-    case HeroType::Loris:
-        casterState.shield += starredValue({700, 800, 1000}, star);
-        dealDamage(target, starredValue({150, 225, 360}, star));
-        combatState(target).stunSeconds = 1.25;
-        break;
-    case HeroType::Sejuani: {
-        casterState.shield += starredValue({525, 575, 775}, star);
-        const bool previouslyChilled = combatState(target).chillSeconds > 0.0;
-        for (Unit* enemy : area) {
-            dealDamage(enemy, starredValue({70, 105, 170}, star));
-            combatState(enemy).chillSeconds = 4.0;
-        }
-        if (previouslyChilled) {
-            combatState(target).stunSeconds = 1.0;
-        }
-        break;
-    }
-    default:
-        break;
-    }
+    // 通过虚函数多态分发到具体英雄类的实现，替代原来的 switch。
+    // 通用前置处理（mana 清零、施法计数）已移入各英雄类实现中。
+    caster->castSkill(this, target);
     showAttackProjectile(caster, target);
     syncFromState();
     emit stateChanged();
@@ -2454,7 +2358,7 @@ void Game::performAttack(Unit* attacker, Unit* target)
     CombatUnitState& attackerState = combatState(attacker);
     if (attacker->heroType() == static_cast<int>(HeroType::Jhin) && attackerState.empoweredShots > 0) {
         if (attackerState.empoweredShots == 1) {
-            damage += starredValue({155, 235, 350}, attacker->star());
+            damage += Game::starredValue({155, 235, 350}, attacker->star());
         }
         --attackerState.empoweredShots;
     }
@@ -2463,7 +2367,7 @@ void Game::performAttack(Unit* attacker, Unit* target)
         && attackerState.empoweredShots > 0;
     dealDamage(target, damage);
     if (jinxRocket) {
-        const int bonus = starredValue({58, 88, 159}, attacker->star());
+        const int bonus = Game::starredValue({58, 88, 159}, attacker->star());
         for (Unit* extra : skillAreaTargets(target, target->owner(), 3)) {
             if (extra != target) {
                 dealDamage(extra, bonus);
@@ -2473,7 +2377,7 @@ void Game::performAttack(Unit* attacker, Unit* target)
         attackerState.basicAttackCount = 0;
     } else if (attacker->heroType() == static_cast<int>(HeroType::Jinx)) {
         ++attackerState.basicAttackCount;
-        const int threshold = starredValue({18, 18, 16}, attacker->star());
+        const int threshold = Game::starredValue({18, 18, 16}, attacker->star());
         if (attackerState.basicAttackCount >= threshold) {
             attackerState.empoweredShots = 1;
         }
@@ -2576,34 +2480,41 @@ void Game::combatTick()
 
     for (Unit* attacker : attackers) {
         if (attacker == nullptr || !isUnitOnBoard(attacker) || attacker->hp() <= 0) {
+            attacker->setState(UnitState::Dead);
             continue;
         }
 
         if (combatState(attacker).stunSeconds > 0.0) {
+            attacker->setState(UnitState::Idle);
             continue;
         }
         double& cooldown = m_attackCooldowns[attacker->id()];
         cooldown = qMax(0.0, cooldown - kCombatTickSeconds);
         if (cooldown > 0.0) {
+            attacker->setState(UnitState::Idle);
             continue;
         }
 
         Unit* target = findNearestEnemy(attacker);
         if (target == nullptr) {
+            attacker->setState(UnitState::Idle);
             continue;
         }
 
         if (attacker->maxMana() > 0 && attacker->mana() >= attacker->maxMana()) {
+            attacker->setState(UnitState::Casting);
             castSkill(attacker, target);
             cooldown = 1.0 / effectiveAttackSpeed(attacker);
             continue;
         }
 
         if (isInAttackRange(attacker, target)) {
+            attacker->setState(UnitState::Attacking);
             performAttack(attacker, target);
             const double attackSpeed = effectiveAttackSpeed(attacker);
             cooldown = 1.0 / attackSpeed;
         } else {
+            attacker->setState(UnitState::Moving);
             moveUnitTowardTarget(attacker, target);
             cooldown = kMoveCooldownSeconds;
         }
@@ -2787,44 +2698,76 @@ void Game::moveUnitTowardTarget(Unit* unit, const Unit* target)
         return;
     }
 
-    const QPoint current = unit->position();
+    const QPoint start = unit->position();
     const QPoint targetPos = target->position();
-    const int currentDx = current.x() - targetPos.x();
-    const int currentDy = current.y() - targetPos.y();
-    int bestDistance = currentDx * currentDx + currentDy * currentDy;
-    QPoint bestPos = current;
+    const int attackRange = unit->range();
 
-    static const std::array<QPoint, 6> directions = {
-        QPoint(1, 0),
-        QPoint(-1, 0),
-        QPoint(0, 1),
-        QPoint(0, -1),
-        QPoint(1, 1),
-        QPoint(-1, -1)
-    };
-
-    for (const QPoint& direction : directions) {
-        const QPoint candidate = current + direction;
-        if (!m_board.isValidPosition(candidate) || m_board.hasUnitAt(candidate)) {
-            continue;
-        }
-
-        const int dx = candidate.x() - targetPos.x();
-        const int dy = candidate.y() - targetPos.y();
-        const int distance = dx * dx + dy * dy;
-        if (distance < bestDistance) {
-            bestDistance = distance;
-            bestPos = candidate;
-        }
-    }
-
-    if (bestPos == current) {
+    // 如果已在攻击范围内则无需移动
+    const int startDx = start.x() - targetPos.x();
+    const int startDy = start.y() - targetPos.y();
+    if (startDx * startDx + startDy * startDy <= attackRange * attackRange) {
         return;
     }
 
-    // 战斗移动直接更新 Board，占位关系仍然由 Board 统一维护，避免图形位置和逻辑位置分离。
+    // BFS 寻路：找到离目标攻击范围内最近的可行格子
+    static const std::array<QPoint, 6> kDirections = {
+        QPoint(1, 0), QPoint(-1, 0), QPoint(0, 1),
+        QPoint(0, -1), QPoint(1, 1), QPoint(-1, -1)
+    };
+
+    std::unordered_map<int, QPoint> parent; // 用线性索引记录前驱
+    auto key = [](const QPoint& p) { return p.x() * 100 + p.y(); };
+    std::deque<QPoint> queue;
+    queue.push_back(start);
+    parent[key(start)] = start;
+
+    QPoint bestGoal = start;
+    int bestDistSq = startDx * startDx + startDy * startDy;
+    bool found = false;
+
+    while (!queue.empty()) {
+        const QPoint cur = queue.front();
+        queue.pop_front();
+
+        const int dx = cur.x() - targetPos.x();
+        const int dy = cur.y() - targetPos.y();
+        const int distSq = dx * dx + dy * dy;
+
+        // 到达目标攻击范围内，选距离最近的
+        if (distSq <= attackRange * attackRange && distSq < bestDistSq) {
+            bestDistSq = distSq;
+            bestGoal = cur;
+            found = true;
+            continue; // BFS 仍在同层搜索更优目标
+        }
+
+        // 如果已找到目标且当前层比最佳更远，可以提前停止
+        if (found && distSq >= bestDistSq) {
+            continue;
+        }
+
+        for (const QPoint& d : kDirections) {
+            const QPoint next = cur + d;
+            if (!m_board.isValidPosition(next)) continue;
+            if (m_board.hasUnitAt(next) && next != start) continue;
+            if (parent.count(key(next))) continue; // 已访问
+            parent[key(next)] = cur;
+            queue.push_back(next);
+        }
+    }
+
+    if (!found || bestGoal == start) {
+        return;
+    }
+
+    // 回溯路径，取第一步
+    QPoint step = bestGoal;
+    while (parent[key(step)] != start) {
+        step = parent[key(step)];
+    }
+
     m_board.removeUnit(unit);
-    m_board.addUnit(unit, bestPos);
+    m_board.addUnit(unit, step);
     syncFromState();
     emit stateChanged();
 }
