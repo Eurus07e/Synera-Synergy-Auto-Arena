@@ -1,0 +1,36 @@
+# macOS
+.DS_Store
+
+# CLion / JetBrains
+.idea/
+cmake-build-*/
+out/
+
+# CMake generated files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+build/
+_build/
+*.ninja
+rules.ninja
+
+# Qt generated files
+*_autogen/
+moc_*.cpp
+qrc_*.cpp
+ui_*.h
+
+# Binary files
+*.o
+*.obj
+*.exe
+*.app
+*.dSYM/
+*.so
+*.dylib
+*.a
+
+# Logs
+*.log
