@@ -33,6 +33,7 @@ void JarvanIV::castSkill(Game* game, Unit* target)
     setMana(0);
     const int star = this->star();
     casterState.shield += game->starredValue({350, 425, 500}, star);
+    casterState.shieldSeconds = 4.0;
     const double multiplier = star == 1 ? 1.20 : star == 2 ? 1.25 : 1.50;
     for (Unit* ally : game->deployedUnits(owner())) {
         CombatUnitState& state = game->combatState(ally);

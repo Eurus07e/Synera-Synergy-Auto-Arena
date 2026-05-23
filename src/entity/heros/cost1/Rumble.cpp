@@ -35,6 +35,7 @@ void Rumble::castSkill(Game* game, Unit* target)
     const Owner enemyOwner = target->owner();
     const QList<Unit*> area = game->skillAreaTargets(target, enemyOwner, 0);
     casterState.shield += game->starredValue({350, 430, 550}, star);
+    casterState.shieldSeconds = 4.0;
     for (Unit* enemy : area) {
         game->dealDamage(enemy, game->starredValue({80, 120, 180}, star));
     }

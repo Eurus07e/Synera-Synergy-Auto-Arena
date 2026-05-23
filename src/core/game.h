@@ -93,6 +93,7 @@ struct InventoryEquipment
 struct CombatUnitState
 {
     int shield = 0;
+    double shieldSeconds = 0.0;
     double stunSeconds = 0.0;
     double chillSeconds = 0.0;
     double attackSpeedBonusMultiplier = 1.0;

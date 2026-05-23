@@ -464,6 +464,7 @@ bool Game::saveGame(const QString& filePath, QString* errorMessage) const
         object["warmogsHealTime"] = healingTime == m_warmogsHealTime.end() ? 0.0 : healingTime->second;
         const CombatUnitState* status = combatState(unit);
         object["shield"] = status == nullptr ? 0 : status->shield;
+        object["shieldSeconds"] = status == nullptr ? 0.0 : status->shieldSeconds;
         object["stunSeconds"] = status == nullptr ? 0.0 : status->stunSeconds;
         object["chillSeconds"] = status == nullptr ? 0.0 : status->chillSeconds;
         object["attackSpeedBonusMultiplier"] = status == nullptr ? 1.0 : status->attackSpeedBonusMultiplier;
@@ -652,6 +653,7 @@ bool Game::loadGame(const QString& filePath, QString* errorMessage)
             m_combatUnits.append(unit);
             CombatUnitState status;
             status.shield = object["shield"].toInt(0);
+            status.shieldSeconds = object["shieldSeconds"].toDouble(0.0);
             status.stunSeconds = object["stunSeconds"].toDouble(0.0);
             status.chillSeconds = object["chillSeconds"].toDouble(0.0);
             status.attackSpeedBonusMultiplier = object["attackSpeedBonusMultiplier"].toDouble(1.0);
@@ -1907,7 +1909,26 @@ Unit* Game::cloneUnitForCombat(const Unit* source)
         return nullptr;
     }
 
-    auto* clone = new Unit(source->name());
+    // 必须创建正确的派生类，否则 castSkill() 虚函数分发会落到基类空实现上。
+    Unit* clone = nullptr;
+    switch (static_cast<HeroType>(source->heroType())) {
+    case HeroType::JarvanIV:  clone = new JarvanIV;  break;
+    case HeroType::Jhin:      clone = new Jhin;      break;
+    case HeroType::Rumble:    clone = new Rumble;    break;
+    case HeroType::Sona:      clone = new Sona;      break;
+    case HeroType::Ashe:      clone = new Ashe;      break;
+    case HeroType::ChoGath:   clone = new ChoGath;   break;
+    case HeroType::XinZhao:   clone = new XinZhao;   break;
+    case HeroType::Yasuo:     clone = new Yasuo;     break;
+    case HeroType::Ahri:      clone = new Ahri;      break;
+    case HeroType::Jinx:      clone = new Jinx;      break;
+    case HeroType::Loris:     clone = new Loris;     break;
+    case HeroType::Sejuani:   clone = new Sejuani;   break;
+    }
+    if (clone == nullptr) {
+        clone = new Unit(source->name());
+    }
+
     clone->setStar(source->star());
     clone->setCost(source->cost());
     clone->setMaxHp(source->maxHp());
@@ -2414,6 +2435,12 @@ void Game::updateCombatEffects()
         state.attackSpeedBonusSeconds = qMax(0.0, state.attackSpeedBonusSeconds - kCombatTickSeconds);
         if (state.attackSpeedBonusSeconds <= 0.0) {
             state.attackSpeedBonusMultiplier = 1.0;
+        }
+        if (state.shield > 0 && state.shieldSeconds > 0.0) {
+            state.shieldSeconds = qMax(0.0, state.shieldSeconds - kCombatTickSeconds);
+            if (state.shieldSeconds <= 0.0) {
+                state.shield = 0;
+            }
         }
     }
 }
