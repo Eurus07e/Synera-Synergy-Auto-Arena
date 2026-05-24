@@ -10,6 +10,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
+
 # QT6 dependency
 find_package(Qt6 COMPONENTS Core Widgets Gui REQUIRED)
 
