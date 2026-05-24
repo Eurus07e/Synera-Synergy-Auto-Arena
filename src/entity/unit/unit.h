@@ -117,6 +117,8 @@ public:
     void setCritRate(double critRate) { m_critRate = critRate; }
     void setOwner(Owner owner) { m_owner = owner; }
     void setPositionType(UnitPositionType positionType) { m_positionType = positionType; }
+    void setOrigins(const std::vector<Origin>& origins) { m_origins = origins; }
+    void setRoles(const std::vector<Role>& roles) { m_roles = roles; }
     void addOrigin(Origin origin) { m_origins.push_back(origin); }
     void addRole(Role role) { m_roles.push_back(role); }
     void setState(UnitState state) { m_state = state; }
@@ -141,8 +143,8 @@ public:
     [[nodiscard]]double critRate() const { return m_critRate; }
     [[nodiscard]]Owner owner() const { return m_owner; }
     [[nodiscard]]UnitPositionType positionType() const { return m_positionType; }
-    [[nodiscard]]std::vector<Origin> origins() const { return m_origins; }
-    [[nodiscard]]std::vector<Role> roles() const { return m_roles; }
+    [[nodiscard]]const std::vector<Origin>& origins() const { return m_origins; }
+    [[nodiscard]]const std::vector<Role>& roles() const { return m_roles; }
     [[nodiscard]]UnitState state() const { return m_state; }
     [[nodiscard]]int heroType() const { return m_heroType; }
     [[nodiscard]]const std::vector<EquipmentType>& equipment() const { return m_equipment; }

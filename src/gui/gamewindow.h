@@ -11,6 +11,7 @@ class QLabel;
 class QPushButton;
 class QHBoxLayout;
 class QVBoxLayout;
+class QScrollArea;
 enum class EquipmentType;
 
 class GameWindow : public QMainWindow
@@ -42,17 +43,18 @@ private:
     QHBoxLayout* m_contentLayout;
     QGraphicsView* m_view;
     QPushButton* m_equipmentAtlasButton;
+    QScrollArea* m_shopScrollArea;
     QWidget* m_shopPanel;
     QLabel* m_topRoundLabel;
     QLabel* m_enemyStatusLabel;
     QLabel* m_synergyStatusLabel;
     QLabel* m_shopTitleLabel;
-    std::array<QPushButton*, 2> m_shopCards;
-    std::array<QLabel*, 2> m_shopNameLabels;
-    std::array<QLabel*, 2> m_shopMetaLabels;
-    std::array<QLabel*, 2> m_shopStatsLabels;
-    std::array<QLabel*, 2> m_shopTraitsLabels;
-    std::array<QLabel*, 2> m_shopSkillLabels;
+    std::array<QPushButton*, 5> m_shopCards;
+    std::array<QLabel*, 5> m_shopNameLabels;
+    std::array<QLabel*, 5> m_shopMetaLabels;
+    std::array<QLabel*, 5> m_shopStatsLabels;
+    std::array<QLabel*, 5> m_shopTraitsLabels;
+    std::array<QLabel*, 5> m_shopSkillLabels;
     QPushButton* m_refreshShopButton;
     QPushButton* m_resetButton;
     QPushButton* m_saveButton;

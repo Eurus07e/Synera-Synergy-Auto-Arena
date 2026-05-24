@@ -12,6 +12,7 @@
 #include <QPainter>
 #include <QPushButton>
 #include <QResizeEvent>
+#include <QScrollArea>
 #include <QScrollBar>
 #include <QSizePolicy>
 #include <QStandardPaths>
@@ -440,17 +441,18 @@ GameWindow::GameWindow(QWidget* parent)
     , m_contentLayout(new QHBoxLayout())
     , m_view(new QGraphicsView(this))
     , m_equipmentAtlasButton(new QPushButton("装备图谱", m_view->viewport()))
+    , m_shopScrollArea(new QScrollArea(this))
     , m_shopPanel(new QWidget(this))
     , m_topRoundLabel(new QLabel(this))
     , m_enemyStatusLabel(new QLabel(this))
     , m_synergyStatusLabel(new QLabel(this))
     , m_shopTitleLabel(new QLabel("Shop", this))
-    , m_shopCards{new QPushButton(this), new QPushButton(this)}
-    , m_shopNameLabels{new QLabel(this), new QLabel(this)}
-    , m_shopMetaLabels{new QLabel(this), new QLabel(this)}
-    , m_shopStatsLabels{new QLabel(this), new QLabel(this)}
-    , m_shopTraitsLabels{new QLabel(this), new QLabel(this)}
-    , m_shopSkillLabels{new QLabel(this), new QLabel(this)}
+    , m_shopCards{new QPushButton(this), new QPushButton(this), new QPushButton(this), new QPushButton(this), new QPushButton(this)}
+    , m_shopNameLabels{new QLabel(this), new QLabel(this), new QLabel(this), new QLabel(this), new QLabel(this)}
+    , m_shopMetaLabels{new QLabel(this), new QLabel(this), new QLabel(this), new QLabel(this), new QLabel(this)}
+    , m_shopStatsLabels{new QLabel(this), new QLabel(this), new QLabel(this), new QLabel(this), new QLabel(this)}
+    , m_shopTraitsLabels{new QLabel(this), new QLabel(this), new QLabel(this), new QLabel(this), new QLabel(this)}
+    , m_shopSkillLabels{new QLabel(this), new QLabel(this), new QLabel(this), new QLabel(this), new QLabel(this)}
     , m_refreshShopButton(new QPushButton("Refresh 4 gold", this))
     , m_resetButton(new QPushButton("Reset", this))
     , m_saveButton(new QPushButton("存档", this))
@@ -653,7 +655,14 @@ void GameWindow::setupUI()
     }
 
     shopLayout->addWidget(m_refreshShopButton);
-    m_contentLayout->addWidget(m_shopPanel);
+    m_shopScrollArea->setWidget(m_shopPanel);
+    m_shopScrollArea->setWidgetResizable(true);
+    m_shopScrollArea->setFrameShape(QFrame::NoFrame);
+    m_shopScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    m_shopScrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    m_shopScrollArea->setFixedWidth(396);
+    m_shopScrollArea->setStyleSheet("QScrollArea { border: none; background: transparent; }");
+    m_contentLayout->addWidget(m_shopScrollArea);
     m_mainLayout->addLayout(m_contentLayout, 1);
 
     QWidget* controlBar = new QWidget(this);

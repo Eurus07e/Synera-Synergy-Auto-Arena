@@ -159,6 +159,25 @@ const std::vector<ShopSlot>& shopPool()
     return kShopPool;
 }
 
+Unit* createHeroUnit(HeroType heroType, const QString& fallbackName = QStringLiteral("Unit"))
+{
+    switch (heroType) {
+    case HeroType::JarvanIV: return new JarvanIV;
+    case HeroType::Jhin: return new Jhin;
+    case HeroType::Rumble: return new Rumble;
+    case HeroType::Sona: return new Sona;
+    case HeroType::Ashe: return new Ashe;
+    case HeroType::ChoGath: return new ChoGath;
+    case HeroType::XinZhao: return new XinZhao;
+    case HeroType::Yasuo: return new Yasuo;
+    case HeroType::Ahri: return new Ahri;
+    case HeroType::Jinx: return new Jinx;
+    case HeroType::Loris: return new Loris;
+    case HeroType::Sejuani: return new Sejuani;
+    }
+    return new Unit(fallbackName);
+}
+
 const ShopSlot* randomCostOneShopSlot()
 {
     // 每局开局只允许发 1 费英雄，所以先从完整商店池中过滤出 1 费候选。
@@ -203,7 +222,7 @@ bool hasOrigin(const Unit* unit, Origin wanted)
     if (unit == nullptr) {
         return false;
     }
-    const std::vector<Origin> origins = unit->origins();
+    const std::vector<Origin>& origins = unit->origins();
     return std::find(origins.cbegin(), origins.cend(), wanted) != origins.cend();
 }
 
@@ -212,7 +231,7 @@ bool hasRole(const Unit* unit, Role wanted)
     if (unit == nullptr) {
         return false;
     }
-    const std::vector<Role> roles = unit->roles();
+    const std::vector<Role>& roles = unit->roles();
     return std::find(roles.cbegin(), roles.cend(), wanted) != roles.cend();
 }
 
@@ -599,16 +618,20 @@ bool Game::loadGame(const QString& filePath, QString* errorMessage)
 
     for (const auto& value : root["units"].toArray()) {
         const QJsonObject object = value.toObject();
-        auto* unit = new Unit(object["name"].toString("Unit"));
-        unit->setHeroType(object["heroType"].toInt(-1));
-        if (unit->heroType() < 0) {
+        const QString unitName = object["name"].toString("Unit");
+        int savedHeroType = object["heroType"].toInt(-1);
+        if (savedHeroType < 0) {
             for (const ShopSlot& available : shopPool()) {
-                if (available.heroName == unit->name()) {
-                    unit->setHeroType(static_cast<int>(available.heroType));
+                if (available.heroName == unitName) {
+                    savedHeroType = static_cast<int>(available.heroType);
                     break;
                 }
             }
         }
+        Unit* unit = savedHeroType >= 0
+            ? createHeroUnit(static_cast<HeroType>(savedHeroType), unitName)
+            : new Unit(unitName);
+        unit->setHeroType(savedHeroType);
         unit->setStar(object["star"].toInt(1));
         unit->setCost(object["cost"].toInt(1));
         unit->setMaxHp(object["maxHp"].toInt(300));
@@ -625,12 +648,16 @@ bool Game::loadGame(const QString& filePath, QString* errorMessage)
         unit->setOwner(static_cast<Owner>(object["owner"].toInt()));
         unit->setPositionType(static_cast<UnitPositionType>(object["positionType"].toInt()));
         unit->setState(static_cast<UnitState>(object["state"].toInt()));
+        std::vector<Origin> origins;
         for (const auto& origin : object["origins"].toArray()) {
-            unit->addOrigin(static_cast<Origin>(origin.toInt()));
+            origins.push_back(static_cast<Origin>(origin.toInt()));
         }
+        unit->setOrigins(origins);
+        std::vector<Role> roles;
         for (const auto& role : object["roles"].toArray()) {
-            unit->addRole(static_cast<Role>(role.toInt()));
+            roles.push_back(static_cast<Role>(role.toInt()));
         }
+        unit->setRoles(roles);
         std::vector<EquipmentType> equipment;
         for (const auto& item : object["equipment"].toArray()) {
             equipment.push_back(static_cast<EquipmentType>(item.toInt()));
@@ -639,16 +666,27 @@ bool Game::loadGame(const QString& filePath, QString* errorMessage)
 
         const QString location = object["location"].toString();
         const QPoint position(object["x"].toInt(-1), object["y"].toInt(-1));
+        bool restored = false;
         if (location == "playerBench") {
-            m_bench.placeUnit(unit, object["slot"].toInt(-1));
+            restored = m_bench.placeUnit(unit, object["slot"].toInt(-1));
         } else if (location == "enemyBench") {
-            m_enemyBench.placeUnit(unit, object["slot"].toInt(-1));
+            restored = m_enemyBench.placeUnit(unit, object["slot"].toInt(-1));
         } else if (location == "board") {
-            m_board.addUnit(unit, position);
+            if (m_board.isValidPosition(position) && !m_board.hasUnitAt(position)) {
+                m_board.addUnit(unit, position);
+                restored = true;
+            }
         } else if (location == "preparedBoard") {
             m_preCombatBoardUnits.append(unit);
             m_preCombatPositions[unit->id()] = position;
+            restored = true;
         }
+
+        if (!restored) {
+            delete unit;
+            continue;
+        }
+
         if (object["combatCopy"].toBool(false)) {
             m_combatUnits.append(unit);
             CombatUnitState status;
@@ -1443,7 +1481,7 @@ void Game::rollShopFor(std::vector<ShopSlot>& targetSlots)
     targetSlots.clear();
     static std::mt19937 rng(std::random_device{}());
     std::uniform_int_distribution<int> dist(0, static_cast<int>(availableShopSlots.size()) - 1);
-    constexpr int kShopSlotCount = 2;
+    constexpr int kShopSlotCount = 5;
 
     for (int i = 0; i < kShopSlotCount; ++i)
     {
@@ -1506,46 +1544,7 @@ bool Game::buyShopUnit(int slotIndex)
 
 Unit* Game::createUnitFromShopSlot(const ShopSlot& slot)
 {
-    Unit* unit = nullptr;
-    switch (slot.heroType)
-    {
-    case HeroType::JarvanIV:
-        unit = new JarvanIV;
-        break;
-    case HeroType::Jhin:
-        unit = new Jhin;
-        break;
-    case HeroType::Rumble:
-        unit = new Rumble;
-        break;
-    case HeroType::Sona:
-        unit = new Sona;
-        break;
-    case HeroType::Ashe:
-        unit = new Ashe;
-        break;
-    case HeroType::ChoGath:
-        unit = new ChoGath;
-        break;
-    case HeroType::XinZhao:
-        unit = new XinZhao;
-        break;
-    case HeroType::Yasuo:
-        unit = new Yasuo;
-        break;
-    case HeroType::Ahri:
-        unit = new Ahri;
-        break;
-    case HeroType::Jinx:
-        unit = new Jinx;
-        break;
-    case HeroType::Loris:
-        unit = new Loris;
-        break;
-    case HeroType::Sejuani:
-        unit = new Sejuani;
-        break;
-    }
+    Unit* unit = createHeroUnit(slot.heroType, slot.heroName);
     if (unit != nullptr) {
         unit->setHeroType(static_cast<int>(slot.heroType));
         unit->setPositionType(slot.positionType);
@@ -1731,7 +1730,10 @@ void Game::applyEquipmentStats(Unit* unit, EquipmentType type)
         break;
     case EquipmentType::BlueCrystal: {
         // 蓝水晶降低施法阈值；当前法力同步压到新上限以内。
-        const int newMaxMana = qMax(0, unit->maxMana() - 30);
+        if (unit->maxMana() <= 0) {
+            break;
+        }
+        const int newMaxMana = qMax(1, unit->maxMana() - 30);
         unit->setMaxMana(newMaxMana);
         unit->setMana(qMin(unit->mana(), newMaxMana));
         break;
@@ -1909,25 +1911,10 @@ Unit* Game::cloneUnitForCombat(const Unit* source)
         return nullptr;
     }
 
-    // 必须创建正确的派生类，否则 castSkill() 虚函数分发会落到基类空实现上。
-    Unit* clone = nullptr;
-    switch (static_cast<HeroType>(source->heroType())) {
-    case HeroType::JarvanIV:  clone = new JarvanIV;  break;
-    case HeroType::Jhin:      clone = new Jhin;      break;
-    case HeroType::Rumble:    clone = new Rumble;    break;
-    case HeroType::Sona:      clone = new Sona;      break;
-    case HeroType::Ashe:      clone = new Ashe;      break;
-    case HeroType::ChoGath:   clone = new ChoGath;   break;
-    case HeroType::XinZhao:   clone = new XinZhao;   break;
-    case HeroType::Yasuo:     clone = new Yasuo;     break;
-    case HeroType::Ahri:      clone = new Ahri;      break;
-    case HeroType::Jinx:      clone = new Jinx;      break;
-    case HeroType::Loris:     clone = new Loris;     break;
-    case HeroType::Sejuani:   clone = new Sejuani;   break;
-    }
-    if (clone == nullptr) {
-        clone = new Unit(source->name());
-    }
+    const int heroType = source->heroType();
+    Unit* clone = heroType >= 0
+        ? createHeroUnit(static_cast<HeroType>(heroType), source->name())
+        : new Unit(source->name());
 
     clone->setStar(source->star());
     clone->setCost(source->cost());
@@ -1944,14 +1931,10 @@ Unit* Game::cloneUnitForCombat(const Unit* source)
     clone->setCritRate(source->critRate());
     clone->setOwner(source->owner());
     clone->setPositionType(source->positionType());
-    clone->setHeroType(source->heroType());
+    clone->setHeroType(heroType);
     clone->setEquipment(source->equipment());
-    for (const Origin& origin : source->origins()) {
-        clone->addOrigin(origin);
-    }
-    for (const Role& role : source->roles()) {
-        clone->addRole(role);
-    }
+    clone->setOrigins(source->origins());
+    clone->setRoles(source->roles());
     return clone;
 }
 
@@ -2164,11 +2147,7 @@ QStringList Game::computeActiveSynergies(Owner owner, const QList<Unit*>& units,
 
     const int gunner = countRole(Role::Gunner);
     if (gunner >= 2) {
-        descriptions << QString("枪手 %1 - 攻击 +15").arg(gunner);
-        if (applyBonuses) {
-            eachMatching([](const Unit* unit) { return hasRole(unit, Role::Gunner); },
-                         [](Unit* unit) { unit->setAtk(unit->atk() + 15); });
-        }
+        descriptions << QString("枪手 %1 - 35% 概率追加一次普攻").arg(gunner);
     }
     Q_UNUSED(owner);
     return descriptions;
@@ -2368,56 +2347,83 @@ void Game::performAttack(Unit* attacker, Unit* target)
         return;
     }
 
-    static std::mt19937 rng(std::random_device{}());
-    std::uniform_real_distribution<double> criticalRoll(0.0, 1.0);
-    const bool critical = criticalRoll(rng) < qBound(0.0, attacker->critRate(), 1.0);
-    int damage = critical ? attacker->atk() * 2 : attacker->atk();
-    if (critical && target->hasEquipment(EquipmentType::Thornmail)) {
-        damage = qFloor(damage * 0.90);
-    }
-
     CombatUnitState& attackerState = combatState(attacker);
-    if (attacker->heroType() == static_cast<int>(HeroType::Jhin) && attackerState.empoweredShots > 0) {
-        if (attackerState.empoweredShots == 1) {
-            damage += Game::starredValue({155, 235, 350}, attacker->star());
-        }
-        --attackerState.empoweredShots;
-    }
+    static std::mt19937 rng(std::random_device{}());
+    std::uniform_real_distribution<double> probabilityRoll(0.0, 1.0);
+    const int alliedGunnerCount = std::count_if(m_combatUnits.cbegin(), m_combatUnits.cend(),
+        [this, attacker](const Unit* candidate) {
+            return candidate != nullptr
+                && candidate->owner() == attacker->owner()
+                && candidate->hp() > 0
+                && hasRole(candidate, Role::Gunner)
+                && this->isUnitOnBoard(candidate);
+        });
+    const int totalShots = alliedGunnerCount >= 2 && hasRole(attacker, Role::Gunner)
+        && probabilityRoll(rng) < 0.35
+        ? 2
+        : 1;
 
-    const bool jinxRocket = attacker->heroType() == static_cast<int>(HeroType::Jinx)
-        && attackerState.empoweredShots > 0;
-    dealDamage(target, damage);
-    if (jinxRocket) {
-        const int bonus = Game::starredValue({58, 88, 159}, attacker->star());
-        for (Unit* extra : skillAreaTargets(target, target->owner(), 3)) {
-            if (extra != target) {
-                dealDamage(extra, bonus);
+    for (int shotIndex = 0; shotIndex < totalShots; ++shotIndex) {
+        if (attacker->hp() <= 0 || !isUnitOnBoard(attacker)) {
+            break;
+        }
+
+        Unit* currentTarget = target;
+        if (currentTarget == nullptr || currentTarget->hp() <= 0 || !isUnitOnBoard(currentTarget)) {
+            currentTarget = findNearestEnemy(attacker);
+        }
+        if (currentTarget == nullptr) {
+            break;
+        }
+
+        const bool critical = probabilityRoll(rng) < qBound(0.0, attacker->critRate(), 1.0);
+        int damage = critical ? attacker->atk() * 2 : attacker->atk();
+        if (critical && currentTarget->hasEquipment(EquipmentType::Thornmail)) {
+            damage = qFloor(damage * 0.90);
+        }
+
+        if (attacker->heroType() == static_cast<int>(HeroType::Jhin) && attackerState.empoweredShots > 0) {
+            if (attackerState.empoweredShots == 1) {
+                damage += Game::starredValue({155, 235, 350}, attacker->star());
+            }
+            --attackerState.empoweredShots;
+        }
+
+        const bool jinxRocket = attacker->heroType() == static_cast<int>(HeroType::Jinx)
+            && attackerState.empoweredShots > 0;
+        dealDamage(currentTarget, damage);
+        if (jinxRocket) {
+            const int bonus = Game::starredValue({58, 88, 159}, attacker->star());
+            for (Unit* extra : skillAreaTargets(currentTarget, currentTarget->owner(), 3)) {
+                if (extra != currentTarget) {
+                    dealDamage(extra, bonus);
+                }
+            }
+            attackerState.empoweredShots = 0;
+            attackerState.basicAttackCount = 0;
+        } else if (attacker->heroType() == static_cast<int>(HeroType::Jinx)) {
+            ++attackerState.basicAttackCount;
+            const int threshold = Game::starredValue({18, 18, 16}, attacker->star());
+            if (attackerState.basicAttackCount >= threshold) {
+                attackerState.empoweredShots = 1;
             }
         }
-        attackerState.empoweredShots = 0;
-        attackerState.basicAttackCount = 0;
-    } else if (attacker->heroType() == static_cast<int>(HeroType::Jinx)) {
-        ++attackerState.basicAttackCount;
-        const int threshold = Game::starredValue({18, 18, 16}, attacker->star());
-        if (attackerState.basicAttackCount >= threshold) {
-            attackerState.empoweredShots = 1;
+
+        if (attacker->maxMana() > 0) {
+            attacker->setMana(qMin(attacker->maxMana(), attacker->mana() + 10));
         }
-    }
 
-    if (attacker->maxMana() > 0) {
-        attacker->setMana(qMin(attacker->maxMana(), attacker->mana() + 10));
+        if (attacker->hasEquipment(EquipmentType::GuinsoosRageblade)) {
+            attacker->setAttackSpeed(attacker->attackSpeed() * 1.06);
+        }
+        if (attacker->hasEquipment(EquipmentType::SpearOfShojin)) {
+            attacker->setMana(qMin(attacker->maxMana(), attacker->mana() + 5));
+        }
+        if (currentTarget->hasEquipment(EquipmentType::Thornmail)) {
+            dealDamage(attacker, 25);
+        }
+        showAttackProjectile(attacker, currentTarget);
     }
-
-    if (attacker->hasEquipment(EquipmentType::GuinsoosRageblade)) {
-        attacker->setAttackSpeed(attacker->attackSpeed() * 1.06);
-    }
-    if (attacker->hasEquipment(EquipmentType::SpearOfShojin)) {
-        attacker->setMana(qMin(attacker->maxMana(), attacker->mana() + 5));
-    }
-    if (target->hasEquipment(EquipmentType::Thornmail)) {
-        dealDamage(attacker, 25);
-    }
-    showAttackProjectile(attacker, target);
 
     syncFromState();
     emit stateChanged();
@@ -2506,7 +2512,11 @@ void Game::combatTick()
     attackers.append(deployedUnits(Owner::EnemyCtrl));
 
     for (Unit* attacker : attackers) {
-        if (attacker == nullptr || !isUnitOnBoard(attacker) || attacker->hp() <= 0) {
+        if (attacker == nullptr) {
+            continue;
+        }
+
+        if (!isUnitOnBoard(attacker) || attacker->hp() <= 0) {
             attacker->setState(UnitState::Dead);
             continue;
         }
