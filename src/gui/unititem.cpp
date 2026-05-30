@@ -41,7 +41,7 @@ UnitItem::UnitItem(Unit* unit, QGraphicsItem* parent)
 
 QRectF UnitItem::boundingRect() const
 {
-    return QRectF(-48, -64, 96, 106);
+    return {-48, -64, 96, 106};
 }
 
 void UnitItem::paint(QPainter* painter, const QStyleOptionGraphicsItem*, QWidget*)
@@ -54,7 +54,7 @@ void UnitItem::paint(QPainter* painter, const QStyleOptionGraphicsItem*, QWidget
     const QColor hpColor = isEnemy ? QColor(235, 85, 75) : QColor(70, 205, 105);
 
     if (!m_sprite.isNull()) {
-        const QRectF targetRect(-40, -40, 80, 80);
+        constexpr QRectF targetRect(-40, -40, 80, 80);
         painter->drawPixmap(targetRect, m_sprite, m_sprite.rect());
         painter->setPen(QPen(ownerColor, 3));
         painter->setBrush(Qt::NoBrush);
@@ -87,9 +87,9 @@ void UnitItem::paint(QPainter* painter, const QStyleOptionGraphicsItem*, QWidget
     }
 
     if (m_unit) {
-        const QRectF labelRect(-34, -62, 68, 16);
-        const QRectF hpBack(-34, -44, 68, 7);
-        const QRectF manaBack(-34, -35, 68, 6);
+        constexpr QRectF labelRect(-34, -62, 68, 16);
+        constexpr QRectF hpBack(-34, -44, 68, 7);
+        constexpr QRectF manaBack(-34, -35, 68, 6);
         qreal hpRatio = 0.0;
         if (m_unit->maxHp() > 0) {
             hpRatio = static_cast<qreal>(m_unit->hp()) / static_cast<qreal>(m_unit->maxHp());
@@ -197,7 +197,7 @@ void UnitItem::ensureSpriteLoaded() const
 QString UnitItem::spriteRelativePathForUnit() const
 {
     if (!m_unit) {
-        return QString();
+        return {};
     }
 
     const QString name = m_unit->name();
@@ -211,7 +211,7 @@ QString UnitItem::spriteRelativePathForUnit() const
         return QStringLiteral("assets/craftpix-wraith-tiny-style-2d-sprites/PNG/Wraith_02/PNG Sequences/Idle/Wraith_02_Idle_000.png");
     }
 
-    return QString();
+    return {};
 }
 
 int UnitItem::unitId() const

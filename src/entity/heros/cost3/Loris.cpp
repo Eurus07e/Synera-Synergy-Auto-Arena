@@ -32,8 +32,8 @@ void Loris::castSkill(Game* game, Unit* target)
     ++casterState.skillCastCount;
     setMana(0);
     const int star = this->star();
-    casterState.shield += game->starredValue({700, 800, 1000}, star);
+    casterState.shield += Game::starredValue({700, 800, 1000}, star);
     casterState.shieldSeconds = 4.0;
-    game->dealDamage(target, game->starredValue({150, 225, 360}, star));
+    game->dealDamage(target, Game::starredValue({150, 225, 360}, star));
     game->combatState(target).stunSeconds = 1.25;
 }

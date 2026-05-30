@@ -13,12 +13,12 @@ class GridItem : public QGraphicsObject
 public:
     GridItem(int row, int col, const QPolygonF& polygon, QGraphicsItem* parent = nullptr);
 
-    QRectF boundingRect() const override;
+    [[nodiscard]] QRectF boundingRect() const override;
     void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget) override;
 
-    int row() const { return m_row; }
-    int col() const { return m_col; }
-    QPoint gridPos() const;
+    [[nodiscard]] int row() const { return m_row; }
+    [[nodiscard]] int col() const { return m_col; }
+    [[nodiscard]] QPoint gridPos() const;
 
     void setBaseColor(const QColor& color);
     void setHoverActive(bool active);

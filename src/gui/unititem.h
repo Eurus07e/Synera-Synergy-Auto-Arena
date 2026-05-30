@@ -14,14 +14,14 @@ class UnitItem : public QGraphicsObject
 public:
     explicit UnitItem(Unit* unit, QGraphicsItem* parent = nullptr);
 
-    QRectF boundingRect() const override;
+    [[nodiscard]] QRectF boundingRect() const override;
     void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget) override;
 
-    Unit* unit() const { return m_unit; }
-    int unitId() const;
+    [[nodiscard]] Unit* unit() const { return m_unit; }
+    [[nodiscard]] int unitId() const;
 
     void setGridPos(const QPoint& gridPos);
-    QPoint gridPos() const { return m_gridPos; }
+    [[nodiscard]] QPoint gridPos() const { return m_gridPos; }
 
 signals:
     void dragStarted(int unitId, const QPoint& sourceGrid, const QPointF& scenePos);
@@ -36,7 +36,7 @@ protected:
 
 private:
     void ensureSpriteLoaded() const;
-    QString spriteRelativePathForUnit() const;
+    [[nodiscard]] QString spriteRelativePathForUnit() const;
 
     Unit* m_unit;
     QPoint m_gridPos;

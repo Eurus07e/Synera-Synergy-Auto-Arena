@@ -34,11 +34,11 @@ void Ashe::castSkill(Game* game, Unit* target)
     const int star = this->star();
     const Owner enemyOwner = target->owner();
     const QList<Unit*> area = game->skillAreaTargets(target, enemyOwner, 0);
-    game->dealDamage(target, game->starredValue({155, 225, 340}, star));
+    game->dealDamage(target, Game::starredValue({155, 225, 340}, star));
     game->combatState(target).chillSeconds = 3.0;
     for (Unit* enemy : area) {
         if (enemy != target) {
-            game->dealDamage(enemy, game->starredValue({51, 74, 112}, star));
+            game->dealDamage(enemy, Game::starredValue({51, 74, 112}, star));
             game->combatState(enemy).chillSeconds = 3.0;
         }
     }

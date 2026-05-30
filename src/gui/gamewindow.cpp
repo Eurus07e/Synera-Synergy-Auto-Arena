@@ -4,6 +4,7 @@
 #include "entity/unit/unit.h"
 #include <QDialog>
 #include <QDir>
+#include <QFrame>
 #include <QGridLayout>
 #include <QGraphicsView>
 #include <QHBoxLayout>
@@ -13,17 +14,23 @@
 #include <QPushButton>
 #include <QResizeEvent>
 #include <QScrollArea>
-#include <QScrollBar>
 #include <QSizePolicy>
 #include <QStandardPaths>
 #include <QStringList>
 #include <QVBoxLayout>
+#include <memory>
 
 namespace {
+template <typename T>
+void releaseToQt(std::unique_ptr<T>& object)
+{
+    [[maybe_unused]] T* qtOwnedObject = object.release();
+}
+
 QString singleSaveSlotPath()
 {
     const QString saveDirectory = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    QDir().mkpath(saveDirectory);
+    [[maybe_unused]] const bool directoryReady = QDir().mkpath(saveDirectory);
     return QDir(saveDirectory).filePath("synera_save.json");
 }
 
@@ -150,7 +157,7 @@ QString equipmentDescription(EquipmentType type)
     case EquipmentType::TearOfTheGoddess:
         return "基础散件\n初始法力值 +15";
     case EquipmentType::ChainVest:
-        return "基础散件\n护甲 +20";
+        return "基础散件\n生命值 +150";
     case EquipmentType::NegatronCloak:
         return "基础散件\n魔法抗性 +20";
     case EquipmentType::GiantsBelt:
@@ -167,7 +174,7 @@ QString equipmentDescription(EquipmentType type)
                "被动：普通攻击命中后回复 5 点法力值。";
     case EquipmentType::Thornmail:
         return "合成：锁子甲 + 锁子甲\n"
-               "护甲 +40\n\n"
+               "生命值 +300\n\n"
                "被动：受到普通攻击时反弹 25 点伤害；"
                "受到的暴击普通攻击伤害减少 10%。";
     case EquipmentType::WarmogsArmor:
@@ -186,13 +193,13 @@ QString equipmentDescription(EquipmentType type)
     return {};
 }
 
-QString equipmentText(const Unit* unit)
+QString equipmentText(const Unit& unit)
 {
-    if (unit == nullptr || unit->equipment().empty()) {
+    if (unit.equipment().empty()) {
         return "装备：无";
     }
     QStringList items;
-    for (const EquipmentType& equipment : unit->equipment()) {
+    for (const EquipmentType& equipment : unit.equipment()) {
         items << equipmentName(equipment);
     }
     return "装备：" + items.join(" | ");
@@ -347,7 +354,7 @@ QString skillDescriptionForUnitName(const QString& name)
 QString unitSkillText(const Unit* unit)
 {
     const QString description = skillDescriptionForUnitName(unit->name());
-    const int colonIndex = description.indexOf(u'：');
+    const qsizetype colonIndex = description.indexOf(u'：');
     if (colonIndex < 0) {
         return description.toHtmlEscaped().replace("\n", "<br>");
     }
@@ -356,15 +363,14 @@ QString unitSkillText(const Unit* unit)
     const QString body = description.mid(colonIndex + 1).trimmed().toHtmlEscaped().replace("\n", "<br>");
     return QString("<div style='font-weight:800; color:#f0d37a; font-size:16px;'>%1</div>"
                    "<div style='margin-top:8px;'>%2</div>")
-        .arg(title)
-        .arg(body);
+        .arg(title, body);
 }
 
 QString skillText(const ShopSlot& slot)
 {
     const QString description = slot.skillDescription;
     // 技能描述里用中文冒号分隔“技能名”和“技能正文”，界面上把技能名单独高亮显示。
-    const int colonIndex = description.indexOf(u'：');
+    const qsizetype colonIndex = description.indexOf(u'：');
     if (colonIndex < 0) {
         return description.toHtmlEscaped();
     }
@@ -373,8 +379,7 @@ QString skillText(const ShopSlot& slot)
     const QString body = description.mid(colonIndex + 1).trimmed().toHtmlEscaped().replace("\n", "<br>");
     return QString("<div style='font-weight:800; color:#f0d37a;'>%1</div>"
                    "<div style='margin-top:4px;'>%2</div>")
-        .arg(title)
-        .arg(body);
+        .arg(title, body);
 }
 
 QString statusButtonStyle(bool affordable)
@@ -442,7 +447,7 @@ GameWindow::GameWindow(QWidget* parent)
     , m_view(new QGraphicsView(this))
     , m_equipmentAtlasButton(new QPushButton("装备图谱", m_view->viewport()))
     , m_shopScrollArea(new QScrollArea(this))
-    , m_shopPanel(new QWidget(this))
+    , m_shopPanel(new QWidget())
     , m_topRoundLabel(new QLabel(this))
     , m_enemyStatusLabel(new QLabel(this))
     , m_synergyStatusLabel(new QLabel(this))
@@ -462,7 +467,7 @@ GameWindow::GameWindow(QWidget* parent)
     , m_goldStatusLabel(new QLabel(this))
     , m_levelStatusButton(new QPushButton(this))
     , m_roundStatusLabel(new QLabel(this))
-    , m_game(new Game(this))
+    , m_game(std::make_unique<Game>())
 {
     setupUI();
     m_game->initialize();
@@ -471,9 +476,14 @@ GameWindow::GameWindow(QWidget* parent)
     fitSceneInView();
 }
 
-GameWindow::~GameWindow() = default;
+GameWindow::~GameWindow()
+{
+    if (m_view != nullptr) {
+        m_view->setScene(nullptr);
+    }
+}
 
-void GameWindow::onResetButtonClicked()
+void GameWindow::onResetButtonClicked() const
 {
     if (m_game) {
         m_game->reset();
@@ -563,8 +573,9 @@ void GameWindow::setupUI()
             font-weight: 700;
         }
     )";
-    auto* topBar = new QWidget(this);
-    auto* topLayout = new QHBoxLayout(topBar);
+    auto topBar = std::make_unique<QWidget>();
+    auto topLayout = std::make_unique<QHBoxLayout>(topBar.get());
+    auto* topBarLayout = topLayout.get();
     topLayout->setContentsMargins(0, 0, 0, 0);
     topLayout->setSpacing(10);
     m_enemyStatusLabel->setStyleSheet(headerLabelStyle);
@@ -575,20 +586,22 @@ void GameWindow::setupUI()
     m_synergyStatusLabel->setMinimumWidth(260);
     m_topRoundLabel->setStyleSheet("font-size: 18px; font-weight: 800; color: #f0d37a;");
     m_topRoundLabel->setAlignment(Qt::AlignCenter);
-    topLayout->addWidget(m_enemyStatusLabel);
-    topLayout->addStretch();
-    topLayout->addWidget(m_synergyStatusLabel);
-    topLayout->addStretch();
-    topLayout->addWidget(m_topRoundLabel);
-    topLayout->addStretch();
-    topLayout->addSpacing(160);
-    m_mainLayout->addWidget(topBar);
+    topBarLayout->addWidget(m_enemyStatusLabel);
+    topBarLayout->addStretch();
+    topBarLayout->addWidget(m_synergyStatusLabel);
+    topBarLayout->addStretch();
+    topBarLayout->addWidget(m_topRoundLabel);
+    topBarLayout->addStretch();
+    topBarLayout->addSpacing(160);
+    releaseToQt(topLayout);
+    m_mainLayout->addWidget(topBar.release());
 
     m_contentLayout->setContentsMargins(0, 0, 0, 0);
     m_contentLayout->setSpacing(12);
     m_contentLayout->addWidget(m_view, 1);
 
-    QVBoxLayout* shopLayout = new QVBoxLayout(m_shopPanel);
+    auto shopLayout = std::make_unique<QVBoxLayout>(m_shopPanel);
+    auto* shopPanelLayout = shopLayout.get();
     shopLayout->setContentsMargins(10, 10, 10, 10);
     shopLayout->setSpacing(10);
     m_shopPanel->setFixedWidth(380);
@@ -620,7 +633,7 @@ void GameWindow::setupUI()
             color: #f2f2f2;
         }
     )");
-    shopLayout->addWidget(m_shopTitleLabel);
+    shopPanelLayout->addWidget(m_shopTitleLabel);
 
     for (int i = 0; i < static_cast<int>(m_shopCards.size()); ++i) {
         QPushButton* card = m_shopCards[i];
@@ -629,7 +642,8 @@ void GameWindow::setupUI()
         // 整张商店卡牌本身就是按钮，点击卡牌任意位置都会尝试购买该英雄。
         card->setFlat(true);
 
-        QVBoxLayout* cardLayout = new QVBoxLayout(card);
+        auto cardLayout = std::make_unique<QVBoxLayout>(card);
+        auto* shopCardLayout = cardLayout.get();
         cardLayout->setContentsMargins(16, 14, 16, 14);
         cardLayout->setSpacing(7);
 
@@ -645,16 +659,18 @@ void GameWindow::setupUI()
         m_shopSkillLabels[i]->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
         m_shopSkillLabels[i]->setStyleSheet("font-size: 13px; color: #e8eaf2;");
 
-        cardLayout->addWidget(m_shopNameLabels[i]);
-        cardLayout->addWidget(m_shopMetaLabels[i]);
-        cardLayout->addWidget(m_shopStatsLabels[i]);
-        cardLayout->addWidget(m_shopTraitsLabels[i]);
-        cardLayout->addSpacing(4);
-        cardLayout->addWidget(m_shopSkillLabels[i], 1);
-        shopLayout->addWidget(card, 1);
+        shopCardLayout->addWidget(m_shopNameLabels[i]);
+        shopCardLayout->addWidget(m_shopMetaLabels[i]);
+        shopCardLayout->addWidget(m_shopStatsLabels[i]);
+        shopCardLayout->addWidget(m_shopTraitsLabels[i]);
+        shopCardLayout->addSpacing(4);
+        shopCardLayout->addWidget(m_shopSkillLabels[i], 1);
+        releaseToQt(cardLayout);
+        shopPanelLayout->addWidget(card, 1);
     }
 
-    shopLayout->addWidget(m_refreshShopButton);
+    shopPanelLayout->addWidget(m_refreshShopButton);
+    releaseToQt(shopLayout);
     m_shopScrollArea->setWidget(m_shopPanel);
     m_shopScrollArea->setWidgetResizable(true);
     m_shopScrollArea->setFrameShape(QFrame::NoFrame);
@@ -665,20 +681,21 @@ void GameWindow::setupUI()
     m_contentLayout->addWidget(m_shopScrollArea);
     m_mainLayout->addLayout(m_contentLayout, 1);
 
-    QWidget* controlBar = new QWidget(this);
-    QHBoxLayout* controlLayout = new QHBoxLayout(controlBar);
+    auto controlBar = std::make_unique<QWidget>();
+    auto controlLayout = std::make_unique<QHBoxLayout>(controlBar.get());
+    auto* controls = controlLayout.get();
     controlLayout->setContentsMargins(0, 0, 0, 0);
     controlLayout->setSpacing(10);
     m_resetButton->setFixedWidth(86);
-    controlLayout->addWidget(m_resetButton);
+    controls->addWidget(m_resetButton);
     m_saveButton->setFixedWidth(72);
     m_loadButton->setFixedWidth(72);
-    controlLayout->addWidget(m_saveButton);
-    controlLayout->addWidget(m_loadButton);
-    controlLayout->addSpacing(14);
+    controls->addWidget(m_saveButton);
+    controls->addWidget(m_loadButton);
+    controls->addSpacing(14);
     m_combatButton->setFixedWidth(128);
-    controlLayout->addWidget(m_combatButton);
-    controlLayout->addSpacing(14);
+    controls->addWidget(m_combatButton);
+    controls->addSpacing(14);
 
     const QString statusStyle = R"(
         QLabel {
@@ -694,7 +711,7 @@ void GameWindow::setupUI()
     for (QLabel* label : {m_hpStatusLabel, m_goldStatusLabel}) {
         label->setStyleSheet(statusStyle);
         label->setAlignment(Qt::AlignCenter);
-        controlLayout->addWidget(label);
+        controls->addWidget(label);
     }
     m_hpStatusLabel->setFixedWidth(104);
     m_goldStatusLabel->setFixedWidth(126);
@@ -718,14 +735,15 @@ void GameWindow::setupUI()
     )");
     m_levelStatusButton->setFixedWidth(112);
     m_levelStatusButton->setStyleSheet(statusButtonStyle(false));
-    controlLayout->addWidget(m_levelStatusButton);
+    controls->addWidget(m_levelStatusButton);
     m_roundStatusLabel->setStyleSheet(statusStyle);
     m_roundStatusLabel->setAlignment(Qt::AlignCenter);
     m_roundStatusLabel->setFixedWidth(112);
-    controlLayout->addWidget(m_roundStatusLabel);
+    controls->addWidget(m_roundStatusLabel);
 
-    controlLayout->addStretch();
-    m_mainLayout->addWidget(controlBar);
+    controls->addStretch();
+    releaseToQt(controlLayout);
+    m_mainLayout->addWidget(controlBar.release());
 
     connect(m_resetButton, &QPushButton::clicked,
             this, &GameWindow::onResetButtonClicked);
@@ -772,14 +790,14 @@ void GameWindow::setupUI()
                     m_game->startCombat();
                 }
             });
-    connect(m_game, &Game::stateChanged,
+    connect(m_game.get(), &Game::stateChanged,
             this, [this]() {
                 refreshStatusBar();
                 refreshShopPanel();
             });
-    connect(m_game, &Game::unitCardRequested,
+    connect(m_game.get(), &Game::unitCardRequested,
             this, &GameWindow::showUnitCard);
-    connect(m_game, &Game::gameFinished,
+    connect(m_game.get(), &Game::gameFinished,
             this, &GameWindow::showGameResult);
     connect(m_levelStatusButton, &QPushButton::clicked,
             this, [this]() {
@@ -807,7 +825,7 @@ void GameWindow::setupUI()
     m_view->setScene(m_game->scene());
 }
 
-void GameWindow::fitSceneInView()
+void GameWindow::fitSceneInView() const
 {
     if (!m_view || !m_game || !m_game->scene()) {
         return;
@@ -837,7 +855,7 @@ void GameWindow::fitSceneInView()
     m_view->centerOn(bounds.center());
 }
 
-void GameWindow::refreshStatusBar()
+void GameWindow::refreshStatusBar() const
 {
     if (!m_game) {
         return;
@@ -937,14 +955,16 @@ void GameWindow::showEquipmentAtlas()
         }
     )");
 
-    auto* layout = new QVBoxLayout(&dialog);
+    auto layout = std::make_unique<QVBoxLayout>(&dialog);
+    auto* atlasLayout = layout.get();
     layout->setContentsMargins(22, 18, 22, 20);
     layout->setSpacing(16);
-    auto* title = new QLabel("装备图谱", &dialog);
-    title->setObjectName("AtlasTitle");
-    layout->addWidget(title);
+    QLabel title("装备图谱", &dialog);
+    title.setObjectName("AtlasTitle");
+    atlasLayout->addWidget(&title);
 
-    auto* tree = new QGridLayout();
+    auto tree = std::make_unique<QGridLayout>();
+    auto* recipeTree = tree.get();
     tree->setHorizontalSpacing(12);
     tree->setVerticalSpacing(13);
     tree->setColumnStretch(0, 2);
@@ -952,29 +972,29 @@ void GameWindow::showEquipmentAtlas()
     tree->setColumnStretch(4, 3);
 
     auto createNode = [this, &dialog](EquipmentType type, bool combined) {
-        auto* button = new QPushButton(equipmentName(type), &dialog);
+        auto button = std::make_unique<QPushButton>(equipmentName(type), &dialog);
         button->setObjectName(combined ? "CombinedEquipmentNode" : "EquipmentNode");
         button->setMinimumHeight(54);
         button->setContextMenuPolicy(Qt::CustomContextMenu);
         button->setToolTip("右键查看装备属性与效果");
-        connect(button, &QPushButton::customContextMenuRequested,
+        connect(button.get(), &QPushButton::customContextMenuRequested,
                 this, [this, type](const QPoint&) {
                     showEquipmentInfo(type);
                 });
         return button;
     };
     auto symbol = [&dialog](const QString& text) {
-        auto* label = new QLabel(text, &dialog);
+        auto label = std::make_unique<QLabel>(text, &dialog);
         label->setObjectName("RecipeSymbol");
         label->setAlignment(Qt::AlignCenter);
         return label;
     };
     auto addRecipe = [&](int row, EquipmentType first, EquipmentType second, EquipmentType result) {
-        tree->addWidget(createNode(first, false), row, 0);
-        tree->addWidget(symbol("+"), row, 1);
-        tree->addWidget(createNode(second, false), row, 2);
-        tree->addWidget(symbol("->"), row, 3);
-        tree->addWidget(createNode(result, true), row, 4);
+        recipeTree->addWidget(createNode(first, false).release(), row, 0);
+        recipeTree->addWidget(symbol("+").release(), row, 1);
+        recipeTree->addWidget(createNode(second, false).release(), row, 2);
+        recipeTree->addWidget(symbol("->").release(), row, 3);
+        recipeTree->addWidget(createNode(result, true).release(), row, 4);
     };
 
     // 图谱直接对应后端合成表，玩家可以从散件关系预判下一件成装。
@@ -987,17 +1007,19 @@ void GameWindow::showEquipmentAtlas()
     addRecipe(3, EquipmentType::GiantsBelt, EquipmentType::GiantsBelt,
               EquipmentType::WarmogsArmor);
 
-    auto* noRecipe = new QLabel("当前无合成关系", &dialog);
+    auto noRecipe = std::make_unique<QLabel>("当前无合成关系", &dialog);
     noRecipe->setAlignment(Qt::AlignCenter);
     noRecipe->setStyleSheet("color: #949cad; font-size: 13px;");
-    tree->addWidget(createNode(EquipmentType::NegatronCloak, false), 4, 0);
-    tree->addWidget(createNode(EquipmentType::SparringGloves, false), 4, 2);
-    tree->addWidget(noRecipe, 4, 4);
-    tree->addWidget(createNode(EquipmentType::IronSword, false), 5, 0);
-    tree->addWidget(createNode(EquipmentType::HasteGloves, false), 5, 2);
-    tree->addWidget(createNode(EquipmentType::BlueCrystal, false), 5, 4);
+    recipeTree->addWidget(createNode(EquipmentType::NegatronCloak, false).release(), 4, 0);
+    recipeTree->addWidget(createNode(EquipmentType::SparringGloves, false).release(), 4, 2);
+    recipeTree->addWidget(noRecipe.release(), 4, 4);
+    recipeTree->addWidget(createNode(EquipmentType::IronSword, false).release(), 5, 0);
+    recipeTree->addWidget(createNode(EquipmentType::HasteGloves, false).release(), 5, 2);
+    recipeTree->addWidget(createNode(EquipmentType::BlueCrystal, false).release(), 5, 4);
 
-    layout->addLayout(tree, 1);
+    atlasLayout->addLayout(recipeTree, 1);
+    releaseToQt(tree);
+    releaseToQt(layout);
     dialog.exec();
 }
 
@@ -1029,25 +1051,27 @@ void GameWindow::showEquipmentInfo(EquipmentType equipment)
         }
     )");
 
-    auto* layout = new QVBoxLayout(&dialog);
+    auto layout = std::make_unique<QVBoxLayout>(&dialog);
+    auto* equipmentLayout = layout.get();
     layout->setContentsMargins(20, 18, 20, 18);
     layout->setSpacing(14);
-    auto* title = new QLabel(equipmentName(equipment), &dialog);
-    title->setStyleSheet("font-size: 21px; color: #f0d37a; font-weight: 800;");
-    auto* description = new QLabel(equipmentDescription(equipment), &dialog);
-    description->setWordWrap(true);
-    description->setAlignment(Qt::AlignTop);
-    description->setStyleSheet("font-size: 15px; line-height: 1.4; background-color: #292b33; border: 1px solid #474c59; border-radius: 4px; padding: 14px;");
-    auto* closeButton = new QPushButton("Close", &dialog);
-    connect(closeButton, &QPushButton::clicked, &dialog, &QDialog::accept);
+    QLabel title(equipmentName(equipment), &dialog);
+    title.setStyleSheet("font-size: 21px; color: #f0d37a; font-weight: 800;");
+    QLabel description(equipmentDescription(equipment), &dialog);
+    description.setWordWrap(true);
+    description.setAlignment(Qt::AlignTop);
+    description.setStyleSheet("font-size: 15px; line-height: 1.4; background-color: #292b33; border: 1px solid #474c59; border-radius: 4px; padding: 14px;");
+    QPushButton closeButton("Close", &dialog);
+    connect(&closeButton, &QPushButton::clicked, &dialog, &QDialog::accept);
 
-    layout->addWidget(title);
-    layout->addWidget(description, 1);
-    layout->addWidget(closeButton, 0, Qt::AlignRight);
+    equipmentLayout->addWidget(&title);
+    equipmentLayout->addWidget(&description, 1);
+    equipmentLayout->addWidget(&closeButton, 0, Qt::AlignRight);
+    releaseToQt(layout);
     dialog.exec();
 }
 
-void GameWindow::showUnitCard(Unit* unit)
+void GameWindow::showUnitCard(const Unit* unit)
 {
     if (unit == nullptr || m_game == nullptr) {
         return;
@@ -1079,39 +1103,36 @@ void GameWindow::showUnitCard(Unit* unit)
         }
     )");
 
-    auto* layout = new QVBoxLayout(&dialog);
+    auto layout = std::make_unique<QVBoxLayout>(&dialog);
+    auto* unitCardLayout = layout.get();
     layout->setContentsMargins(18, 16, 18, 16);
     layout->setSpacing(12);
-    auto* titleLabel = new QLabel(QString("%1  %2")
-        .arg(unit->name())
-        .arg(heroLocalizedName(unit->name())), &dialog);
-    titleLabel->setStyleSheet("font-size: 22px; font-weight: 800; color: #f0d37a;");
+    QLabel titleLabel(QString("%1  %2").arg(unit->name(), heroLocalizedName(unit->name())), &dialog);
+    titleLabel.setStyleSheet("font-size: 22px; font-weight: 800; color: #f0d37a;");
 
-    auto* statsLabel = new QLabel(unitStatsText(unit), &dialog);
-    statsLabel->setTextFormat(Qt::RichText);
-    statsLabel->setStyleSheet("font-size: 16px; font-family: Menlo, Monaco, monospace;");
+    QLabel statsLabel(unitStatsText(unit), &dialog);
+    statsLabel.setTextFormat(Qt::RichText);
+    statsLabel.setStyleSheet("font-size: 16px; font-family: Menlo, Monaco, monospace;");
 
-    auto* traitsLabel = new QLabel(QString("Origin: %1\nRole: %2")
-        .arg(originsText(unit))
-        .arg(rolesText(unit)), &dialog);
-    traitsLabel->setWordWrap(true);
-    traitsLabel->setStyleSheet("font-size: 14px; color: #d6d9e5;");
+    QLabel traitsLabel(QString("Origin: %1\nRole: %2").arg(originsText(unit), rolesText(unit)), &dialog);
+    traitsLabel.setWordWrap(true);
+    traitsLabel.setStyleSheet("font-size: 14px; color: #d6d9e5;");
 
-    auto* equipmentLabel = new QLabel(equipmentText(unit), &dialog);
-    equipmentLabel->setWordWrap(true);
-    equipmentLabel->setStyleSheet("font-size: 14px; color: #f0d37a; font-weight: 700;");
+    QLabel equipmentLabel(equipmentText(*unit), &dialog);
+    equipmentLabel.setWordWrap(true);
+    equipmentLabel.setStyleSheet("font-size: 14px; color: #f0d37a; font-weight: 700;");
 
-    auto* combatStatusLabel = new QLabel(m_game->combatStatusText(unit), &dialog);
-    combatStatusLabel->setWordWrap(true);
-    combatStatusLabel->setVisible(!combatStatusLabel->text().isEmpty());
-    combatStatusLabel->setStyleSheet("font-size: 14px; color: #8fd1ff; font-weight: 700;");
+    QLabel combatStatusLabel(m_game->combatStatusText(unit), &dialog);
+    combatStatusLabel.setWordWrap(true);
+    combatStatusLabel.setVisible(!combatStatusLabel.text().isEmpty());
+    combatStatusLabel.setStyleSheet("font-size: 14px; color: #8fd1ff; font-weight: 700;");
 
-    auto* skillLabel = new QLabel(unitSkillText(unit), &dialog);
-    skillLabel->setTextFormat(Qt::RichText);
-    skillLabel->setWordWrap(true);
-    skillLabel->setAlignment(Qt::AlignTop);
-    skillLabel->setMinimumHeight(170);
-    skillLabel->setStyleSheet(R"(
+    QLabel skillLabel(unitSkillText(unit), &dialog);
+    skillLabel.setTextFormat(Qt::RichText);
+    skillLabel.setWordWrap(true);
+    skillLabel.setAlignment(Qt::AlignTop);
+    skillLabel.setMinimumHeight(170);
+    skillLabel.setStyleSheet(R"(
         QLabel {
             background-color: #292b33;
             border: 1px solid #4a4d58;
@@ -1122,20 +1143,21 @@ void GameWindow::showUnitCard(Unit* unit)
         }
     )");
 
-    auto* sellButton = new QPushButton(QString("Sell for %1 gold").arg(unit->cost()), &dialog);
-    connect(sellButton, &QPushButton::clicked, &dialog, [this, unitId, &dialog]() {
+    QPushButton sellButton(QString("Sell for %1 gold").arg(unit->cost()), &dialog);
+    connect(&sellButton, &QPushButton::clicked, &dialog, [this, unitId, &dialog]() {
         if (m_game != nullptr && m_game->sellUnitById(unitId)) {
             dialog.accept();
         }
     });
 
-    layout->addWidget(titleLabel);
-    layout->addWidget(statsLabel);
-    layout->addWidget(traitsLabel);
-    layout->addWidget(equipmentLabel);
-    layout->addWidget(combatStatusLabel);
-    layout->addWidget(skillLabel, 1);
-    layout->addWidget(sellButton);
+    unitCardLayout->addWidget(&titleLabel);
+    unitCardLayout->addWidget(&statsLabel);
+    unitCardLayout->addWidget(&traitsLabel);
+    unitCardLayout->addWidget(&equipmentLabel);
+    unitCardLayout->addWidget(&combatStatusLabel);
+    unitCardLayout->addWidget(&skillLabel, 1);
+    unitCardLayout->addWidget(&sellButton);
+    releaseToQt(layout);
     dialog.exec();
 }
 
@@ -1167,30 +1189,32 @@ void GameWindow::showGameResult(bool playerWon)
         }
     )");
 
-    auto* layout = new QVBoxLayout(&dialog);
+    auto layout = std::make_unique<QVBoxLayout>(&dialog);
+    auto* resultLayout = layout.get();
     layout->setContentsMargins(28, 24, 28, 22);
-    layout->addStretch();
+    resultLayout->addStretch();
 
-    auto* title = new QLabel(playerWon ? "VICTORY" : "DEFEAT", &dialog);
-    title->setAlignment(Qt::AlignCenter);
-    title->setStyleSheet(playerWon
+    QLabel title(playerWon ? "VICTORY" : "DEFEAT", &dialog);
+    title.setAlignment(Qt::AlignCenter);
+    title.setStyleSheet(playerWon
         ? "color: #d9bb65; font-size: 54px; font-weight: 800; font-style: italic; font-family: 'Snell Roundhand', 'Times New Roman';"
         : "color: #c76c65; font-size: 54px; font-weight: 800; font-style: italic; font-family: 'Snell Roundhand', 'Times New Roman';");
-    layout->addWidget(title);
+    resultLayout->addWidget(&title);
 
-    auto* subtitle = new QLabel(playerWon ? "ENEMY DEFEATED" : "YOUR TACTICIANS HAVE FALLEN", &dialog);
-    subtitle->setAlignment(Qt::AlignCenter);
-    subtitle->setStyleSheet("color: #b6bac5; font-size: 13px; letter-spacing: 2px;");
-    layout->addWidget(subtitle);
-    layout->addStretch();
+    QLabel subtitle(playerWon ? "ENEMY DEFEATED" : "YOUR TACTICIANS HAVE FALLEN", &dialog);
+    subtitle.setAlignment(Qt::AlignCenter);
+    subtitle.setStyleSheet("color: #b6bac5; font-size: 13px; letter-spacing: 2px;");
+    resultLayout->addWidget(&subtitle);
+    resultLayout->addStretch();
 
-    auto* closeButton = new QPushButton("Close", &dialog);
-    connect(closeButton, &QPushButton::clicked, &dialog, &QDialog::accept);
-    layout->addWidget(closeButton, 0, Qt::AlignCenter);
+    QPushButton closeButton("Close", &dialog);
+    connect(&closeButton, &QPushButton::clicked, &dialog, &QDialog::accept);
+    resultLayout->addWidget(&closeButton, 0, Qt::AlignCenter);
+    releaseToQt(layout);
     dialog.exec();
 }
 
-void GameWindow::refreshShopPanel()
+void GameWindow::refreshShopPanel() const
 {
     if (!m_game) {
         return;
@@ -1209,15 +1233,13 @@ void GameWindow::refreshShopPanel()
             card->setEnabled(canBuy);
             card->setStyleSheet(shopCardStyle(alreadyOwned));
             m_shopNameLabels[i]->setText(QString("%1  %2")
-                .arg(slot.heroName)
-                .arg(heroLocalizedName(slot.heroType)));
+                .arg(slot.heroName, heroLocalizedName(slot.heroType)));
             m_shopMetaLabels[i]->setText(QString("Cost: %1 gold     Star: %2")
                 .arg(slot.cost)
                 .arg(slot.star));
             m_shopStatsLabels[i]->setText(shopStatsText(slot));
             m_shopTraitsLabels[i]->setText(QString("Origin: %1\nRole: %2")
-                .arg(originsText(slot))
-                .arg(rolesText(slot)));
+                .arg(originsText(slot), rolesText(slot)));
             m_shopSkillLabels[i]->setText(skillText(slot));
         } else {
             card->setVisible(true);

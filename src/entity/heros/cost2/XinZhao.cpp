@@ -32,7 +32,7 @@ void XinZhao::castSkill(Game* game, Unit* target)
     ++casterState.skillCastCount;
     setMana(0);
     const int star = this->star();
-    game->dealDamage(target, game->starredValue({65, 100, 150}, star) * 3);
-    Game::healUnit(this, game->starredValue({105, 145, 200}, star));
+    game->dealDamage(target, Game::starredValue({65, 100, 150}, star) * 3);
+    Game::healUnit(this, Game::starredValue({105, 145, 200}, star));
     game->combatState(target).stunSeconds = 1.5;
 }

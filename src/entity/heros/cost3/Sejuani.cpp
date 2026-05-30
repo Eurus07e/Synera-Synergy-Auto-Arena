@@ -34,11 +34,11 @@ void Sejuani::castSkill(Game* game, Unit* target)
     const int star = this->star();
     const Owner enemyOwner = target->owner();
     const QList<Unit*> area = game->skillAreaTargets(target, enemyOwner, 0);
-    casterState.shield += game->starredValue({525, 575, 775}, star);
+    casterState.shield += Game::starredValue({525, 575, 775}, star);
     casterState.shieldSeconds = 4.0;
     const bool previouslyChilled = game->combatState(target).chillSeconds > 0.0;
     for (Unit* enemy : area) {
-        game->dealDamage(enemy, game->starredValue({70, 105, 170}, star));
+        game->dealDamage(enemy, Game::starredValue({70, 105, 170}, star));
         game->combatState(enemy).chillSeconds = 4.0;
     }
     if (previouslyChilled) {

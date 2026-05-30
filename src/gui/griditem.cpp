@@ -46,7 +46,7 @@ void GridItem::paint(QPainter* painter, const QStyleOptionGraphicsItem*, QWidget
 
 QPoint GridItem::gridPos() const
 {
-    return QPoint(m_col, m_row);
+    return {m_col, m_row};
 }
 
 void GridItem::setBaseColor(const QColor& color)

@@ -20,13 +20,13 @@ public:
     Unit* getUnitAt(const QPoint& pos) const;
     bool hasUnitAt(const QPoint& pos) const;
 
-    bool isValidPosition(const QPoint& pos) const;
-    bool isPlayerHalf(const QPoint& pos) const;
+    [[nodiscard]] static bool isValidPosition(const QPoint& pos);
+    [[nodiscard]] static bool isPlayerHalf(const QPoint& pos);
 
     void clear();
 
 private:
-    int indexOf(const QPoint& pos) const;
+    [[nodiscard]] static int indexOf(const QPoint& pos);
 
     QVector<Unit*> m_cells;
     QHash<Unit*, QPoint> m_unitToPosition;

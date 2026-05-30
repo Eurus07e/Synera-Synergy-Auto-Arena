@@ -123,7 +123,7 @@ public:
     [[nodiscard]] bool benchFull() const;
 
     void handleDragStarted(int unitId, const QPoint& sourceGrid, const QPointF& scenePos);
-    void handleDragMoved(int unitId, const QPoint& sourceGrid, const QPointF& scenePos);
+    void handleDragMoved(int unitId, const QPoint& sourceGrid, const QPointF& scenePos) const;
     void handleDropCommand(int unitId, const QPoint& sourceGrid, const QPointF& scenePos);
     void handleEquipmentDragStarted(int itemId, const QPointF& scenePos);
     void handleEquipmentDragMoved(int itemId, const QPointF& scenePos);
@@ -148,7 +148,7 @@ public:
 
 
     // Combat interface for hero skill polymorphism
-    [[nodiscard]] CombatUnitState& combatState(Unit* unit);
+    [[nodiscard]] CombatUnitState& combatState(const Unit* unit);
     [[nodiscard]] const CombatUnitState* combatState(const Unit* unit) const;
     void dealDamage(Unit* target, int damage);
     static void healUnit(Unit* unit, int amount);
@@ -204,12 +204,11 @@ private:
     [[nodiscard]] static Unit* cloneUnitForCombat(const Unit* source);
     [[nodiscard]] QList<Unit*> findMergeCandidates(const Unit* baseUnit) const;
     void removeUnitCompletely(Unit* unit);
-    Unit* tryMergeUnit(Unit* unit);
+    Unit* tryMergeUnit(const Unit* unit);
     bool sellUnit(Unit* unit);
     bool equipInventoryItem(int itemId, Unit* unit);
     static void applyEquipmentStats(Unit* unit, EquipmentType type);
     void tryDropBasicEquipment();
-    [[nodiscard]] static double targetThreatScore(const Unit* attacker, const Unit* target);
     [[nodiscard]]Unit* findNearestEnemy(const Unit* attacker) const;
     [[nodiscard]] bool isInAttackRange(const Unit* attacker, const Unit* target) const;
     void performAttack(Unit* attacker, Unit* target);

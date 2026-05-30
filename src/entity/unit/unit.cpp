@@ -1,4 +1,5 @@
 #include "unit.h"
+#include <algorithm>
 #include <utility>
 
 int Unit::s_nextId = 0;
@@ -30,10 +31,8 @@ Unit::Unit(QString name)
 
 bool Unit::hasEquipment(EquipmentType equipment) const
 {
-    for (EquipmentType item : m_equipment) {
-        if (item == equipment) {
-            return true;
-        }
-    }
-    return false;
+    return std::any_of(m_equipment.cbegin(), m_equipment.cend(),
+        [equipment](EquipmentType item) {
+            return item == equipment;
+        });
 }

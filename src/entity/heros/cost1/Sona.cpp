@@ -35,13 +35,14 @@ void Sona::castSkill(Game* game, Unit* target)
     const Owner enemyOwner = target->owner();
     const QList<Unit*> victims = game->skillAreaTargets(target, enemyOwner, 2);
     for (Unit* enemy : victims) {
-        game->dealDamage(enemy, game->starredValue({130, 195, 300}, star));
+        game->dealDamage(enemy, Game::starredValue({130, 195, 300}, star));
     }
     Unit* lowest = nullptr;
-    for (Unit* ally : game->deployedUnits(owner())) {
+    const QList<Unit*> allies = game->deployedUnits(owner());
+    for (Unit* ally : allies) {
         if (lowest == nullptr || ally->hp() < lowest->hp()) {
             lowest = ally;
         }
     }
-    Game::healUnit(lowest, game->starredValue({40, 50, 80}, star));
+    Game::healUnit(lowest, Game::starredValue({40, 50, 80}, star));
 }

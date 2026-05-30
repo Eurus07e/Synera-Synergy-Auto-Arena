@@ -3,6 +3,7 @@
 
 #include <QMainWindow>
 #include <array>
+#include <memory>
 
 class Game;
 class Unit;
@@ -20,20 +21,20 @@ class GameWindow : public QMainWindow
 
 public:
     explicit GameWindow(QWidget* parent = nullptr);
-    ~GameWindow();
+    ~GameWindow() override;
 
 protected:
     void resizeEvent(QResizeEvent* event) override;
 
 private slots:
-    void onResetButtonClicked();
+    void onResetButtonClicked() const;
 
 private:
     void setupUI();
-    void fitSceneInView();
-    void refreshStatusBar();
-    void refreshShopPanel();
-    void showUnitCard(Unit* unit);
+    void fitSceneInView() const;
+    void refreshStatusBar() const;
+    void refreshShopPanel() const;
+    void showUnitCard(const Unit* unit);
     void showGameResult(bool playerWon);
     void showEquipmentAtlas();
     void showEquipmentInfo(EquipmentType equipment);
@@ -64,7 +65,7 @@ private:
     QLabel* m_goldStatusLabel;
     QPushButton* m_levelStatusButton;
     QLabel* m_roundStatusLabel;
-    Game* m_game;
+    std::unique_ptr<Game> m_game;
 };
 
 #endif // GAMEWINDOW_H

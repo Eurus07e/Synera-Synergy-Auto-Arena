@@ -12,9 +12,9 @@ class EquipmentItem : public QGraphicsObject
 public:
     EquipmentItem(int itemId, QString title, QString stats, QColor color, QGraphicsItem* parent = nullptr);
 
-    QRectF boundingRect() const override;
+    [[nodiscard]] QRectF boundingRect() const override;
     void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget) override;
-    int itemId() const { return m_itemId; }
+    [[nodiscard]] int itemId() const { return m_itemId; }
 
 signals:
     void dragStarted(int itemId, const QPointF& scenePos);

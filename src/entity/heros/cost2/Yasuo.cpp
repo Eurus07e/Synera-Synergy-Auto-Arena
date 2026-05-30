@@ -35,10 +35,10 @@ void Yasuo::castSkill(Game* game, Unit* target)
     const Owner enemyOwner = target->owner();
     const QList<Unit*> area = game->skillAreaTargets(target, enemyOwner, 0);
     if (area.size() == 1) {
-        game->dealDamage(target, game->starredValue({103, 157, 233}, star) * 2);
+        game->dealDamage(target, Game::starredValue({103, 157, 233}, star) * 2);
     } else {
         for (Unit* enemy : area) {
-            game->dealDamage(enemy, game->starredValue({103, 157, 233}, star));
+            game->dealDamage(enemy, Game::starredValue({103, 157, 233}, star));
         }
     }
 }

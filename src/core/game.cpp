@@ -4,14 +4,8 @@
 #include "gui/equipmentitem.h"
 #include "gui/unititem.h"
 #include <QColor>
-#include <QFont>
-#include <QBrush>
 #include <QGraphicsEllipseItem>
-#include <QGraphicsLineItem>
-#include <QGraphicsPathItem>
-#include <QGraphicsRectItem>
 #include <QGraphicsScene>
-#include <QGraphicsTextItem>
 #include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -26,6 +20,7 @@
 #include <algorithm>
 #include <array>
 #include <limits>
+#include <utility>
 
 
 #include "entity/heros/cost1/JarvanIV.h"
@@ -86,7 +81,7 @@ QString equipmentStatText(EquipmentType type)
     case EquipmentType::RecurveBow: return "攻速 +10%";
     case EquipmentType::NeedlesslyLargeRod: return "法强 +10";
     case EquipmentType::TearOfTheGoddess: return "法力 +15";
-    case EquipmentType::ChainVest: return "护甲 +20";
+    case EquipmentType::ChainVest: return "生命 +150";
     case EquipmentType::NegatronCloak: return "魔抗 +20";
     case EquipmentType::GiantsBelt: return "生命 +150";
     case EquipmentType::SparringGloves: return "暴击 +20%";
@@ -587,10 +582,12 @@ bool Game::loadGame(const QString& filePath, QString* errorMessage)
     m_nextEquipmentId = root["nextEquipmentId"].toInt(0);
     m_playerInterestGoldSnapshot = root["playerInterestGoldSnapshot"].toInt(0);
     m_enemyInterestGoldSnapshot = root["enemyInterestGoldSnapshot"].toInt(0);
-    for (const auto& value : root["playerCombatSynergies"].toArray()) {
+    const QJsonArray playerCombatSynergies = root["playerCombatSynergies"].toArray();
+    for (const auto& value : playerCombatSynergies) {
         m_playerCombatSynergies.append(value.toString());
     }
-    for (const auto& value : root["enemyCombatSynergies"].toArray()) {
+    const QJsonArray enemyCombatSynergies = root["enemyCombatSynergies"].toArray();
+    for (const auto& value : enemyCombatSynergies) {
         m_enemyCombatSynergies.append(value.toString());
     }
 
@@ -608,7 +605,8 @@ bool Game::loadGame(const QString& filePath, QString* errorMessage)
     loadShop(root["shop"].toArray(), m_shopSlots);
     loadShop(root["enemyShop"].toArray(), m_enemyShopSlots);
 
-    for (const auto& value : root["equipmentInventory"].toArray()) {
+    const QJsonArray equipmentInventory = root["equipmentInventory"].toArray();
+    for (const auto& value : equipmentInventory) {
         const QJsonObject object = value.toObject();
         const InventoryEquipment equipment{object["id"].toInt(),
                                            static_cast<EquipmentType>(object["type"].toInt())};
@@ -616,7 +614,8 @@ bool Game::loadGame(const QString& filePath, QString* errorMessage)
         createEquipmentItem(equipment);
     }
 
-    for (const auto& value : root["units"].toArray()) {
+    const QJsonArray savedUnits = root["units"].toArray();
+    for (const auto& value : savedUnits) {
         const QJsonObject object = value.toObject();
         const QString unitName = object["name"].toString("Unit");
         int savedHeroType = object["heroType"].toInt(-1);
@@ -649,17 +648,20 @@ bool Game::loadGame(const QString& filePath, QString* errorMessage)
         unit->setPositionType(static_cast<UnitPositionType>(object["positionType"].toInt()));
         unit->setState(static_cast<UnitState>(object["state"].toInt()));
         std::vector<Origin> origins;
-        for (const auto& origin : object["origins"].toArray()) {
+        const QJsonArray savedOrigins = object["origins"].toArray();
+        for (const auto& origin : savedOrigins) {
             origins.push_back(static_cast<Origin>(origin.toInt()));
         }
         unit->setOrigins(origins);
         std::vector<Role> roles;
-        for (const auto& role : object["roles"].toArray()) {
+        const QJsonArray savedRoles = object["roles"].toArray();
+        for (const auto& role : savedRoles) {
             roles.push_back(static_cast<Role>(role.toInt()));
         }
         unit->setRoles(roles);
         std::vector<EquipmentType> equipment;
-        for (const auto& item : object["equipment"].toArray()) {
+        const QJsonArray savedEquipment = object["equipment"].toArray();
+        for (const auto& item : savedEquipment) {
             equipment.push_back(static_cast<EquipmentType>(item.toInt()));
         }
         unit->setEquipment(equipment);
@@ -672,7 +674,7 @@ bool Game::loadGame(const QString& filePath, QString* errorMessage)
         } else if (location == "enemyBench") {
             restored = m_enemyBench.placeUnit(unit, object["slot"].toInt(-1));
         } else if (location == "board") {
-            if (m_board.isValidPosition(position) && !m_board.hasUnitAt(position)) {
+            if (Board::isValidPosition(position) && !m_board.hasUnitAt(position)) {
                 m_board.addUnit(unit, position);
                 restored = true;
             }
@@ -747,7 +749,7 @@ void Game::handleDragStarted(int unitId, const QPoint& sourceGrid, const QPointF
     }
 }
 
-void Game::handleDragMoved(int unitId, const QPoint&, const QPointF& scenePos)
+void Game::handleDragMoved(int unitId, const QPoint&, const QPointF& scenePos) const
 {
     if (!m_dragActive) {
         return;
@@ -949,11 +951,11 @@ bool Game::canApplyDrop(int unitId, const QPoint& source, const QPoint& target) 
         return false;
     }
 
-    if (!m_board.isValidPosition(target)) {
+    if (!Board::isValidPosition(target)) {
         return false;
     }
 
-    if (!m_board.isPlayerHalf(target)) {
+    if (!Board::isPlayerHalf(target)) {
         return false;
     }
 
@@ -962,8 +964,8 @@ bool Game::canApplyDrop(int unitId, const QPoint& source, const QPoint& target) 
     }
 
     // A source outside the board means the unit is currently coming from the bench.
-    if (m_board.isValidPosition(source)) {
-        if (!m_board.isPlayerHalf(source) || source == target) {
+    if (Board::isValidPosition(source)) {
+        if (!Board::isPlayerHalf(source) || source == target) {
             return false;
         }
         return m_board.getUnitAt(source) == unit;
@@ -1002,11 +1004,11 @@ bool Game::canSwapBoardUnits(int unitId, const QPoint& source, const QPoint& tar
     }
     Unit* unit = findUnitById(unitId);
     if (!unit || unit->owner() != Owner::PlayerCtrl || m_combatUnits.contains(unit)
-        || !m_board.isValidPosition(source) || !m_board.isValidPosition(target)) {
+        || !Board::isValidPosition(source) || !Board::isValidPosition(target)) {
         return false;
     }
 
-    if (source == target || !m_board.isPlayerHalf(source) || !m_board.isPlayerHalf(target)) {
+    if (source == target || !Board::isPlayerHalf(source) || !Board::isPlayerHalf(target)) {
         return false;
     }
 
@@ -1039,11 +1041,11 @@ bool Game::canSwapBenchWithBoardUnit(int unitId, const QPoint& target) const
     Unit* unit = findUnitById(unitId);
     const int sourceSlot = m_bench.findUnit(unit);
     if (!unit || unit->owner() != Owner::PlayerCtrl || m_combatUnits.contains(unit)
-        || !Bench::isValidSlot(sourceSlot) || !m_board.isValidPosition(target)) {
+        || !Bench::isValidSlot(sourceSlot) || !Board::isValidPosition(target)) {
         return false;
     }
 
-    if (!m_board.isPlayerHalf(target)) {
+    if (!Board::isPlayerHalf(target)) {
         return false;
     }
 
@@ -1065,8 +1067,8 @@ bool Game::canSwapBoardWithBenchUnit(int unitId, int targetSlot) const
 
     const QPoint source = unit->position();
     Unit* targetUnit = m_bench.getUnitAt(targetSlot);
-    return m_board.isValidPosition(source)
-        && m_board.isPlayerHalf(source)
+    return Board::isValidPosition(source)
+        && Board::isPlayerHalf(source)
         && m_board.getUnitAt(source) == unit
         && targetUnit
         && targetUnit->owner() == unit->owner();
@@ -1181,7 +1183,7 @@ void Game::buildScene()
         }
     }
 
-    for (Unit* unit : m_units) {
+    for (Unit* unit : std::as_const(m_units)) {
         createUnitItem(unit);
     }
 
@@ -1296,7 +1298,7 @@ void Game::syncFromState()
         }
 
         const QPoint pos = item->unit()->position();
-        if (m_board.isValidPosition(pos) && m_board.getUnitAt(pos) == item->unit()) {
+        if (Board::isValidPosition(pos) && m_board.getUnitAt(pos) == item->unit()) {
             item->setVisible(true);
             item->setGridPos(pos);
             item->setPos(gridToWorld(pos.y(), pos.x()));
@@ -1609,7 +1611,7 @@ void Game::removeUnitCompletely(Unit* unit)
     delete unit;
 }
 
-Unit* Game::tryMergeUnit(Unit* unit)
+Unit* Game::tryMergeUnit(const Unit* unit)
 {
     if (unit == nullptr)return nullptr;
 
@@ -1623,7 +1625,7 @@ Unit* Game::tryMergeUnit(Unit* unit)
     {
         const QPoint pos = candidate->position();
 
-        if (m_board.isValidPosition(pos) && m_board.getUnitAt(pos) == candidate)
+        if (Board::isValidPosition(pos) && m_board.getUnitAt(pos) == candidate)
         {
             onBoardCandidates.append(candidate);
         }else if (m_bench.findUnit(candidate) != -1 || m_enemyBench.findUnit(candidate) != -1)
@@ -1710,7 +1712,8 @@ void Game::applyEquipmentStats(Unit* unit, EquipmentType type)
         unit->setMana(qMin(unit->maxMana(), unit->mana() + 15));
         break;
     case EquipmentType::ChainVest:
-        unit->setArmor(unit->armor() + 20);
+        unit->setMaxHp(unit->maxHp() + 150);
+        unit->setHp(unit->hp() + 150);
         break;
     case EquipmentType::NegatronCloak:
         unit->setMagicResist(unit->magicResist() + 20);
@@ -1878,7 +1881,7 @@ bool Game::isUnitOnBoard(const Unit* unit) const
     if (unit == nullptr)return false;
 
     const QPoint pos = unit->position();
-    return m_board.isValidPosition(pos) && m_board.getUnitAt(pos) == unit;
+    return Board::isValidPosition(pos) && m_board.getUnitAt(pos) == unit;
 }
 
 void Game::createEnemyStarterUnit()
@@ -1895,7 +1898,7 @@ void Game::createEnemyStarterUnit()
     }
     enemyUnit->setOwner(Owner::EnemyCtrl);
     constexpr QPoint enemyPos(3,1);
-    if (!m_board.isValidPosition(enemyPos) || m_board.hasUnitAt(enemyPos))
+    if (!Board::isValidPosition(enemyPos) || m_board.hasUnitAt(enemyPos))
     {
         delete enemyUnit;
         return;
@@ -1947,7 +1950,7 @@ void Game::setupCombatCopies()
     QList<Unit*> sources = deployedUnits(Owner::PlayerCtrl);
     sources.append(deployedUnits(Owner::EnemyCtrl));
 
-    for (Unit* source : sources) {
+    for (Unit* source : std::as_const(sources)) {
         if (source == nullptr) {
             continue;
         }
@@ -1955,11 +1958,11 @@ void Game::setupCombatCopies()
         m_preCombatPositions[source->id()] = source->position();
     }
 
-    for (Unit* source : m_preCombatBoardUnits) {
+    for (Unit* source : std::as_const(m_preCombatBoardUnits)) {
         m_board.removeUnit(source);
     }
 
-    for (Unit* source : m_preCombatBoardUnits) {
+    for (Unit* source : std::as_const(m_preCombatBoardUnits)) {
         Unit* clone = cloneUnitForCombat(source);
         if (clone == nullptr) {
             continue;
@@ -1994,7 +1997,7 @@ void Game::cleanupCombatCopies()
 
 void Game::restorePreparationBoard()
 {
-    for (Unit* unit : m_preCombatBoardUnits) {
+    for (Unit* unit : std::as_const(m_preCombatBoardUnits)) {
         if (unit == nullptr) {
             continue;
         }
@@ -2026,7 +2029,7 @@ QList<Unit*> Game::deployedUnits(Owner owner) const
     return units;
 }
 
-CombatUnitState& Game::combatState(Unit* unit)
+CombatUnitState& Game::combatState(const Unit* unit)
 {
     return m_combatStates[unit->id()];
 }
@@ -2074,14 +2077,14 @@ QStringList Game::computeActiveSynergies(Owner owner, const QList<Unit*>& units,
 {
     QStringList descriptions;
     auto countOrigin = [&units](Origin origin) {
-        return std::count_if(units.cbegin(), units.cend(), [origin](const Unit* unit) {
+        return static_cast<int>(std::count_if(units.cbegin(), units.cend(), [origin](const Unit* unit) {
             return hasOrigin(unit, origin);
-        });
+        }));
     };
     auto countRole = [&units](Role role) {
-        return std::count_if(units.cbegin(), units.cend(), [role](const Unit* unit) {
+        return static_cast<int>(std::count_if(units.cbegin(), units.cend(), [role](const Unit* unit) {
             return hasRole(unit, role);
-        });
+        }));
     };
     auto eachMatching = [&units](auto predicate, auto bonus) {
         for (Unit* unit : units) {
@@ -2132,7 +2135,7 @@ QStringList Game::computeActiveSynergies(Owner owner, const QList<Unit*>& units,
         descriptions << QString("护卫 %1 - 护盾 +%2").arg(guardian).arg(guardianShield);
         if (applyBonuses) {
             eachMatching([](const Unit* unit) { return hasRole(unit, Role::Guardian); },
-                         [this, guardianShield](Unit* unit) { combatState(unit).shield += guardianShield; });
+                         [this, guardianShield](const Unit* unit) { combatState(unit).shield += guardianShield; });
         }
     }
 
@@ -2141,7 +2144,7 @@ QStringList Game::computeActiveSynergies(Owner owner, const QList<Unit*>& units,
         descriptions << QString("神盾使 %1 - 护盾 +180").arg(protector);
         if (applyBonuses) {
             eachMatching([](const Unit* unit) { return hasRole(unit, Role::Protector); },
-                         [this](Unit* unit) { combatState(unit).shield += 180; });
+                         [this](const Unit* unit) { combatState(unit).shield += 180; });
         }
     }
 
@@ -2157,31 +2160,6 @@ void Game::applyCombatSynergies()
 {
     m_playerCombatSynergies = computeActiveSynergies(Owner::PlayerCtrl, deployedUnits(Owner::PlayerCtrl), true);
     m_enemyCombatSynergies = computeActiveSynergies(Owner::EnemyCtrl, deployedUnits(Owner::EnemyCtrl), true);
-}
-
-double Game::targetThreatScore(const Unit* attacker, const Unit* target)
-{
-    if (attacker == nullptr || target == nullptr) {
-        return -std::numeric_limits<double>::max();
-    }
-
-    const QPoint attackerPos = attacker->position();
-    const QPoint targetPos = target->position();
-    const int dx = attackerPos.x() - targetPos.x();
-    const int dy = attackerPos.y() - targetPos.y();
-    const int distanceSquared = dx * dx + dy * dy;
-
-    constexpr double kDistanceWeight = 1000.0;
-    constexpr double kDamageWeight = 4.0;
-    constexpr double kHealthWeight = 0.15;
-    constexpr double kRangeWeight = 30.0;
-    const double expectedAttackThreat = target->atk() * target->attackSpeed() * (1.0 + target->critRate());
-
-    // 距离是锁敌主因；输出、剩余生命和射程只在距离接近时让高威胁目标优先被处理。
-    return -distanceSquared * kDistanceWeight
-        + expectedAttackThreat * kDamageWeight
-        + target->hp() * kHealthWeight
-        + target->range() * kRangeWeight;
 }
 
 Unit* Game::findNearestEnemy(const Unit* attacker) const
@@ -2201,25 +2179,28 @@ Unit* Game::findNearestEnemy(const Unit* attacker) const
     Unit* bestTarget = nullptr;
 
     QList<Unit*> enemies = deployedUnits(enemyOwner);
-    double bestScore = -std::numeric_limits<double>::max();
-    for (Unit* enemy : enemies)
+    int bestDistanceSquared = std::numeric_limits<int>::max();
+    for (Unit* enemy : std::as_const(enemies))
     {
         if (enemy == nullptr)
         {
             continue;
         }
 
-        const double score = targetThreatScore(attacker, enemy);
-        const bool tiedScore = qAbs(score - bestScore) < 0.001;
+        const QPoint attackerPos = attacker->position();
         const QPoint enemyPos = enemy->position();
+        const int dx = attackerPos.x() - enemyPos.x();
+        const int dy = attackerPos.y() - enemyPos.y();
+        const int distanceSquared = dx * dx + dy * dy;
         const QPoint selectedPos = bestTarget == nullptr ? QPoint() : bestTarget->position();
         const bool preferredTieBreak = bestTarget == nullptr
             || enemy->hp() > bestTarget->hp()
             || (enemy->hp() == bestTarget->hp() && enemyPos.x() < selectedPos.x())
             || (enemy->hp() == bestTarget->hp() && enemyPos.x() == selectedPos.x()
                 && enemyPos.y() > selectedPos.y());
-        if (score > bestScore || (tiedScore && preferredTieBreak)) {
-            bestScore = score;
+        if (distanceSquared < bestDistanceSquared
+            || (distanceSquared == bestDistanceSquared && preferredTieBreak)) {
+            bestDistanceSquared = distanceSquared;
             bestTarget = enemy;
         }
     }
@@ -2283,7 +2264,8 @@ QList<Unit*> Game::skillAreaTargets(const Unit* target, Owner targetOwner, int m
     }
     targets.append(const_cast<Unit*>(target));
     const QPoint center = target->position();
-    for (Unit* candidate : deployedUnits(targetOwner)) {
+    const QList<Unit*> candidates = deployedUnits(targetOwner);
+    for (Unit* candidate : candidates) {
         if (candidate == nullptr || candidate == target) {
             continue;
         }
@@ -2350,14 +2332,14 @@ void Game::performAttack(Unit* attacker, Unit* target)
     CombatUnitState& attackerState = combatState(attacker);
     static std::mt19937 rng(std::random_device{}());
     std::uniform_real_distribution<double> probabilityRoll(0.0, 1.0);
-    const int alliedGunnerCount = std::count_if(m_combatUnits.cbegin(), m_combatUnits.cend(),
+    const int alliedGunnerCount = static_cast<int>(std::count_if(m_combatUnits.cbegin(), m_combatUnits.cend(),
         [this, attacker](const Unit* candidate) {
             return candidate != nullptr
                 && candidate->owner() == attacker->owner()
                 && candidate->hp() > 0
                 && hasRole(candidate, Role::Gunner)
                 && this->isUnitOnBoard(candidate);
-        });
+        }));
     const int totalShots = alliedGunnerCount >= 2 && hasRole(attacker, Role::Gunner)
         && probabilityRoll(rng) < 0.35
         ? 2
@@ -2394,7 +2376,8 @@ void Game::performAttack(Unit* attacker, Unit* target)
         dealDamage(currentTarget, damage);
         if (jinxRocket) {
             const int bonus = Game::starredValue({58, 88, 159}, attacker->star());
-            for (Unit* extra : skillAreaTargets(currentTarget, currentTarget->owner(), 3)) {
+            const QList<Unit*> splashTargets = skillAreaTargets(currentTarget, currentTarget->owner(), 3);
+            for (Unit* extra : splashTargets) {
                 if (extra != currentTarget) {
                     dealDamage(extra, bonus);
                 }
@@ -2431,7 +2414,7 @@ void Game::performAttack(Unit* attacker, Unit* target)
 
 void Game::updateCombatEffects()
 {
-    for (Unit* unit : m_combatUnits) {
+    for (Unit* unit : std::as_const(m_combatUnits)) {
         if (unit == nullptr) {
             continue;
         }
@@ -2453,7 +2436,7 @@ void Game::updateCombatEffects()
 
 void Game::updateWarmogsHealing()
 {
-    for (Unit* unit : m_combatUnits) {
+    for (Unit* unit : std::as_const(m_combatUnits)) {
         if (unit == nullptr || unit->hp() <= 0 || !isUnitOnBoard(unit)) {
             continue;
         }
@@ -2477,7 +2460,7 @@ void Game::removeDeadUnits()
 {
     QList<Unit*> deadUnits;
 
-    for (Unit* unit : m_units) {
+    for (Unit* unit : std::as_const(m_units)) {
         if (unit == nullptr) {
             continue;
         }
@@ -2511,7 +2494,7 @@ void Game::combatTick()
     QList<Unit*> attackers = deployedUnits(Owner::PlayerCtrl);
     attackers.append(deployedUnits(Owner::EnemyCtrl));
 
-    for (Unit* attacker : attackers) {
+    for (Unit* attacker : std::as_const(attackers)) {
         if (attacker == nullptr) {
             continue;
         }
@@ -2747,7 +2730,7 @@ void Game::moveUnitTowardTarget(Unit* unit, const Unit* target)
     }
 
     // BFS 寻路：找到离目标攻击范围内最近的可行格子
-    static const std::array<QPoint, 6> kDirections = {
+    static constexpr std::array<QPoint, 6> kDirections = {
         QPoint(1, 0), QPoint(-1, 0), QPoint(0, 1),
         QPoint(0, -1), QPoint(1, 1), QPoint(-1, -1)
     };
@@ -2785,7 +2768,7 @@ void Game::moveUnitTowardTarget(Unit* unit, const Unit* target)
 
         for (const QPoint& d : kDirections) {
             const QPoint next = cur + d;
-            if (!m_board.isValidPosition(next)) continue;
+            if (!Board::isValidPosition(next)) continue;
             if (m_board.hasUnitAt(next) && next != start) continue;
             if (parent.count(key(next))) continue; // 已访问
             parent[key(next)] = cur;
@@ -2973,7 +2956,7 @@ QPoint Game::preferredEnemyDeployPosition(const Unit* unit) const
     for (int row : rows) {
         for (int col : cols) {
             const QPoint pos(col, row);
-            if (m_board.isValidPosition(pos) && !m_board.isPlayerHalf(pos) && !m_board.hasUnitAt(pos)) {
+            if (Board::isValidPosition(pos) && !Board::isPlayerHalf(pos) && !m_board.hasUnitAt(pos)) {
                 return pos;
             }
         }
@@ -2995,10 +2978,10 @@ void Game::arrangeEnemyFormation()
                 continue;
             }
             QPoint target = preferredEnemyDeployPosition(unit);
-            if (!m_board.isValidPosition(target)) {
+            if (!Board::isValidPosition(target)) {
                 target = fallbackEnemyDeployPosition();
             }
-            if (m_board.isValidPosition(target)) {
+            if (Board::isValidPosition(target)) {
                 m_board.addUnit(unit, target);
             }
         }
@@ -3031,10 +3014,10 @@ bool Game::deployEnemyUnitFromBench(Unit* unit)
     }
 
     QPoint target = preferredEnemyDeployPosition(unit);
-    if (!m_board.isValidPosition(target)) {
+    if (!Board::isValidPosition(target)) {
         target = fallbackEnemyDeployPosition();
     }
-    if (!m_board.isValidPosition(target)) {
+    if (!Board::isValidPosition(target)) {
         return false;
     }
 

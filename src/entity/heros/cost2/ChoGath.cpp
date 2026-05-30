@@ -34,8 +34,8 @@ void ChoGath::castSkill(Game* game, Unit* target)
     const int star = this->star();
     const Owner enemyOwner = target->owner();
     const QList<Unit*> area = game->skillAreaTargets(target, enemyOwner, 0);
-    Game::healUnit(this, game->starredValue({200, 225, 400}, star));
+    Game::healUnit(this, Game::starredValue({200, 225, 400}, star));
     for (Unit* enemy : area) {
-        game->dealDamage(enemy, game->starredValue({88, 118, 155}, star));
+        game->dealDamage(enemy, Game::starredValue({88, 118, 155}, star));
     }
 }

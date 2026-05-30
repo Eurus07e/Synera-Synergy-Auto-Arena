@@ -36,6 +36,6 @@ void Ahri::castSkill(Game* game, Unit* target)
     const Owner enemyOwner = target->owner();
     const QList<Unit*> victims = game->skillAreaTargets(target, enemyOwner, 3);
     for (Unit* enemy : victims) {
-        game->dealDamage(enemy, game->starredValue({82, 125, 225}, star));
+        game->dealDamage(enemy, Game::starredValue({82, 125, 225}, star));
     }
 }

@@ -44,7 +44,7 @@ public:
 private:
     static constexpr int kInitialHp = 100;
     static constexpr int kInitialGold = 6;
-    static constexpr int kInitialLevel = 1;
+    static constexpr int kInitialLevel = 3;
     static constexpr int kInitialRound = 1;
     static constexpr int kMaxLevel = 10;
     static constexpr int kLevelProgressPerPurchase = 4;

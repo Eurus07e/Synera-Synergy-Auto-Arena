@@ -40,12 +40,12 @@ bool Board::hasUnitAt(const QPoint& pos) const
     return getUnitAt(pos) != nullptr;
 }
 
-bool Board::isValidPosition(const QPoint& pos) const
+bool Board::isValidPosition(const QPoint& pos)
 {
     return pos.x() >= 0 && pos.x() < COLS && pos.y() >= 0 && pos.y() < ROWS;
 }
 
-bool Board::isPlayerHalf(const QPoint& pos) const
+bool Board::isPlayerHalf(const QPoint& pos)
 {
     return pos.y() >= ROWS / 2;
 }
@@ -56,7 +56,7 @@ void Board::clear()
     m_unitToPosition.clear();
 }
 
-int Board::indexOf(const QPoint& pos) const
+int Board::indexOf(const QPoint& pos)
 {
     if (!isValidPosition(pos)) {
         return -1;

@@ -32,10 +32,11 @@ void JarvanIV::castSkill(Game* game, Unit* target)
     ++casterState.skillCastCount;
     setMana(0);
     const int star = this->star();
-    casterState.shield += game->starredValue({350, 425, 500}, star);
+    casterState.shield += Game::starredValue({350, 425, 500}, star);
     casterState.shieldSeconds = 4.0;
     const double multiplier = star == 1 ? 1.20 : star == 2 ? 1.25 : 1.50;
-    for (Unit* ally : game->deployedUnits(owner())) {
+    const QList<Unit*> allies = game->deployedUnits(owner());
+    for (Unit* ally : allies) {
         CombatUnitState& state = game->combatState(ally);
         state.attackSpeedBonusMultiplier = qMax(state.attackSpeedBonusMultiplier, multiplier);
         state.attackSpeedBonusSeconds = 4.0;
