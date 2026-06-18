@@ -15,16 +15,6 @@
 
 ---
 
-
-
-## Academic Integrity Notice / 学术诚信声明
-
-This repository is published for project presentation and learning reference only. Before the assignment deadline **2026-07-05**, copying, submitting, or reusing this project as another student's PA work is strictly prohibited.
-
-本仓库仅用于项目展示与学习参考。在作业提交截止日期 **2026-07-05** 之前，严禁任何人复制、提交或复用本项目作为自己的高级程序设计 PA 作业。
-
----
-
 ## Choose Language / 选择语言
 
 Please choose your preferred documentation language:
@@ -50,15 +40,6 @@ It focuses on object-oriented game architecture, including a unified unit model,
 
 项目重点展示面向对象游戏系统设计，包括统一单位模型、多态英雄技能、网格战斗、BFS 寻路、装备系统、羁绊效果，以及基于 JSON 的存档与读档支持。
 
----
-
-## Course Information / 课程信息
-
-- **Course**: Advanced Programming
-- **University**: Nanjing University
-- **Year**: 2026
-- **Project Type**: Programming Assignment
-- **Project Name**: Synera: Synergy Auto-Arena
 
 ---
 
