@@ -1,9 +1,0 @@
-{
-  "ok": true,
-  "run_dir": "/Users/shuyuxuan/Downloads/Synera_starter/hatch-pet-runs/mai-muse",
-  "spritesheet": "/Users/shuyuxuan/Downloads/Synera_starter/hatch-pet-runs/mai-muse/final/spritesheet.webp",
-  "validation": "/Users/shuyuxuan/Downloads/Synera_starter/hatch-pet-runs/mai-muse/final/validation.json",
-  "contact_sheet": "/Users/shuyuxuan/Downloads/Synera_starter/hatch-pet-runs/mai-muse/qa/contact-sheet.png",
-  "review": "/Users/shuyuxuan/Downloads/Synera_starter/hatch-pet-runs/mai-muse/qa/review.json",
-  "package": "/Users/shuyuxuan/.codex/pets/maimuse"
-}

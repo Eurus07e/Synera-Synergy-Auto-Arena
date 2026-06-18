@@ -6,7 +6,6 @@
 cmake-build-*/
 out/
 
-
 # CMake generated files
 CMakeFiles/
 CMakeCache.txt
@@ -35,3 +34,5 @@ ui_*.h
 
 # Logs
 *.log
+
+# Project ignore rules

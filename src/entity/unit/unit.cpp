@@ -31,6 +31,8 @@ Unit::Unit(QString name)
 
 bool Unit::hasEquipment(EquipmentType equipment) const
 {
+    //只要容器里有任意一个元素满足条件，就返回 true
+    //cbegin() 和 cend() 是只读迭代器
     return std::any_of(m_equipment.cbegin(), m_equipment.cend(),
         [equipment](EquipmentType item) {
             return item == equipment;

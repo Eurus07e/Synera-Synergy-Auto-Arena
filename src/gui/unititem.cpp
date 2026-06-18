@@ -1,8 +1,10 @@
 #include "gui/unititem.h"
 #include "entity/unit/unit.h"
 #include <QCoreApplication>
+#include <QDir>
 #include <QGraphicsSceneMouseEvent>
 #include <QPainter>
+#include <QPainterPath>
 #include <QFileInfo>
 
 namespace {
@@ -41,7 +43,7 @@ UnitItem::UnitItem(Unit* unit, QGraphicsItem* parent)
 
 QRectF UnitItem::boundingRect() const
 {
-    return {-48, -64, 96, 106};
+    return {-34, -40, 68, 70};
 }
 
 void UnitItem::paint(QPainter* painter, const QStyleOptionGraphicsItem*, QWidget*)
@@ -54,11 +56,23 @@ void UnitItem::paint(QPainter* painter, const QStyleOptionGraphicsItem*, QWidget
     const QColor hpColor = isEnemy ? QColor(235, 85, 75) : QColor(70, 205, 105);
 
     if (!m_sprite.isNull()) {
-        constexpr QRectF targetRect(-40, -40, 80, 80);
-        painter->drawPixmap(targetRect, m_sprite, m_sprite.rect());
+        constexpr QRectF avatarRect(-27, -20, 54, 48);
+        constexpr qreal avatarRadius = 7.0;
+        painter->setPen(Qt::NoPen);
+        painter->setBrush(QColor(18, 18, 22, 175));
+        painter->drawRoundedRect(avatarRect.adjusted(-2, -2, 2, 2), avatarRadius + 2.0, avatarRadius + 2.0);
+
+        QPainterPath clipPath;
+        clipPath.addRoundedRect(avatarRect, avatarRadius, avatarRadius);
+        painter->save();
+        painter->setRenderHint(QPainter::SmoothPixmapTransform);
+        painter->setClipPath(clipPath);
+        painter->drawPixmap(avatarRect, m_sprite, m_sprite.rect());
+        painter->restore();
+
         painter->setPen(QPen(ownerColor, 3));
         painter->setBrush(Qt::NoBrush);
-        painter->drawEllipse(QRectF(-31, -31, 62, 62));
+        painter->drawRoundedRect(avatarRect, avatarRadius, avatarRadius);
     } else {
         painter->setPen(Qt::NoPen);
         painter->setBrush(QColor(20, 20, 20, 110));
@@ -87,9 +101,9 @@ void UnitItem::paint(QPainter* painter, const QStyleOptionGraphicsItem*, QWidget
     }
 
     if (m_unit) {
-        constexpr QRectF labelRect(-34, -62, 68, 16);
-        constexpr QRectF hpBack(-34, -44, 68, 7);
-        constexpr QRectF manaBack(-34, -35, 68, 6);
+        constexpr QRectF labelRect(-27, -38, 54, 11);
+        constexpr QRectF hpBack(-27, -27, 54, 5);
+        constexpr QRectF manaBack(-27, -22, 54, 4);
         qreal hpRatio = 0.0;
         if (m_unit->maxHp() > 0) {
             hpRatio = static_cast<qreal>(m_unit->hp()) / static_cast<qreal>(m_unit->maxHp());
@@ -111,19 +125,19 @@ void UnitItem::paint(QPainter* painter, const QStyleOptionGraphicsItem*, QWidget
 
         painter->setPen(QColor(255, 226, 120));
         QFont labelFont = painter->font();
-        labelFont.setPointSize(12);
+        labelFont.setPointSize(8);
         labelFont.setBold(true);
         painter->setFont(labelFont);
-        painter->drawText(QRectF(labelRect.left(), labelRect.top(), 24, labelRect.height()),
+        painter->drawText(QRectF(labelRect.left(), labelRect.top(), 15, labelRect.height()),
                           Qt::AlignLeft | Qt::AlignVCenter,
                           QString::number(m_unit->star()) + "*");
 
         painter->setPen(Qt::white);
         QFont nameFont = painter->font();
-        nameFont.setPointSize(8);
+        nameFont.setPointSize(6);
         nameFont.setBold(true);
         painter->setFont(nameFont);
-        painter->drawText(QRectF(labelRect.left() + 28, labelRect.top(), labelRect.width() - 28, labelRect.height()),
+        painter->drawText(QRectF(labelRect.left() + 17, labelRect.top(), labelRect.width() - 17, labelRect.height()),
                           Qt::AlignLeft | Qt::AlignVCenter,
                           m_unit->name());
 
@@ -143,12 +157,12 @@ void UnitItem::paint(QPainter* painter, const QStyleOptionGraphicsItem*, QWidget
 
         int equipmentIndex = 0;
         for (EquipmentType equipment : m_unit->equipment()) {
-            const QRectF badge(-34 + equipmentIndex * 23, 23, 21, 14);
+            const QRectF badge(-27 + equipmentIndex * 18, 17, 16, 10);
             painter->setPen(QPen(QColor(218, 185, 92), 1));
             painter->setBrush(QColor(56, 48, 32, 225));
             painter->drawRoundedRect(badge, 2, 2);
             QFont itemFont = painter->font();
-            itemFont.setPointSize(6);
+            itemFont.setPointSize(5);
             itemFont.setBold(true);
             painter->setFont(itemFont);
             painter->setPen(QColor(245, 218, 138));
@@ -171,9 +185,14 @@ void UnitItem::ensureSpriteLoaded() const
     }
 
     const QString appDir = QCoreApplication::applicationDirPath();
+    const QString currentDir = QDir::currentPath();
     const QString roots[] = {
+        currentDir,
+        QFileInfo(currentDir + "/..").canonicalFilePath(),
         QFileInfo(appDir + "/..").canonicalFilePath(),
-        QFileInfo(appDir + "/../..").canonicalFilePath()
+        QFileInfo(appDir + "/../..").canonicalFilePath(),
+        QFileInfo(appDir + "/../../..").canonicalFilePath(),
+        QFileInfo(appDir + "/../../../..").canonicalFilePath()
     };
 
     QPixmap pix;
@@ -191,7 +210,7 @@ void UnitItem::ensureSpriteLoaded() const
         return;
     }
 
-    m_sprite = pix.scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    m_sprite = pix;
 }
 
 QString UnitItem::spriteRelativePathForUnit() const
@@ -201,14 +220,41 @@ QString UnitItem::spriteRelativePathForUnit() const
     }
 
     const QString name = m_unit->name();
-    if (name == QString::fromUtf8("战术")) {
-        return QStringLiteral("assets/craftpix-reaper-man-chibi-2d-game-sprites/Reaper_Man_1/PNG/PNG Sequences/Idle/0_Reaper_Man_Idle_000.png");
+    if (name == QStringLiteral("Jarvan IV")) {
+        return QStringLiteral("assets/hero_portraits/jarvan_iv.png");
     }
-    if (name == QString::fromUtf8("弓手")) {
-        return QStringLiteral("assets/craftpix-satyr-tiny-style-2d-sprites/PNG/Satyr_01/PNG Sequences/Idle/Satyr_01_Idle_000.png");
+    if (name == QStringLiteral("Jhin")) {
+        return QStringLiteral("assets/hero_portraits/jhin.png");
     }
-    if (name == QString::fromUtf8("法师")) {
-        return QStringLiteral("assets/craftpix-wraith-tiny-style-2d-sprites/PNG/Wraith_02/PNG Sequences/Idle/Wraith_02_Idle_000.png");
+    if (name == QStringLiteral("Rumble")) {
+        return QStringLiteral("assets/hero_portraits/rumble.png");
+    }
+    if (name == QStringLiteral("Sona")) {
+        return QStringLiteral("assets/hero_portraits/sona.png");
+    }
+    if (name == QStringLiteral("Ashe")) {
+        return QStringLiteral("assets/hero_portraits/ashe.png");
+    }
+    if (name == QStringLiteral("Cho'Gath")) {
+        return QStringLiteral("assets/hero_portraits/chogath.png");
+    }
+    if (name == QStringLiteral("Xin Zhao")) {
+        return QStringLiteral("assets/hero_portraits/xin_zhao.png");
+    }
+    if (name == QStringLiteral("Yasuo")) {
+        return QStringLiteral("assets/hero_portraits/yasuo.png");
+    }
+    if (name == QStringLiteral("Ahri")) {
+        return QStringLiteral("assets/hero_portraits/ahri.png");
+    }
+    if (name == QStringLiteral("Jinx")) {
+        return QStringLiteral("assets/hero_portraits/jinx.png");
+    }
+    if (name == QStringLiteral("Loris")) {
+        return QStringLiteral("assets/hero_portraits/loris.png");
+    }
+    if (name == QStringLiteral("Sejuani")) {
+        return QStringLiteral("assets/hero_portraits/sejuani.png");
     }
 
     return {};

@@ -42,8 +42,8 @@ public:
     int recordLoss();
 
 private:
-    static constexpr int kInitialHp = 100;
-    static constexpr int kInitialGold = 6;
+    static constexpr int kInitialHp = 15;
+    static constexpr int kInitialGold = 600;
     static constexpr int kInitialLevel = 3;
     static constexpr int kInitialRound = 1;
     static constexpr int kMaxLevel = 10;

@@ -26,7 +26,6 @@ void Player::reset()
 
 void Player::restoreState(int hp, int gold, int level, int round, int levelProgress, int lossStreak)
 {
-    // 读档只通过这里覆盖玩家状态，避免无效数值破坏等级和生命约束。
     m_hp = std::clamp(hp, 0, kInitialHp);
     m_gold = std::max(gold, 0);
     m_level = std::clamp(level, kInitialLevel, kMaxLevel);

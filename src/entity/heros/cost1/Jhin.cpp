@@ -26,6 +26,7 @@ Jhin::Jhin()
     m_state = UnitState::Idle;
 }
 
+// 技能：完美谢幕。进入4发强化普攻状态；强化普攻的额外伤害与超远射程在 Game::performAttack()/isInAttackRange() 中结算。
 void Jhin::castSkill(Game* game, Unit* target)
 {
     CombatUnitState& casterState = game->combatState(this);

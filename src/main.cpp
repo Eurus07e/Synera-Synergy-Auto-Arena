@@ -11,8 +11,7 @@ int main(int argc, char *argv[])
 
     GameWindow window;
     window.setWindowTitle("Synera - Starter");
-    window.resize(900, 700);
-    window.show();
+    window.showFullScreen();
 
     return QApplication::exec();
 }

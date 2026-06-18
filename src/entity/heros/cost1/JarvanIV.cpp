@@ -26,6 +26,7 @@ JarvanIV::JarvanIV()
     m_state = UnitState::Idle;
 }
 
+// 技能：德邦军旗。嘉文获得4秒护盾，并使全体友军获得4秒攻速加成。
 void JarvanIV::castSkill(Game* game, Unit* target)
 {
     CombatUnitState& casterState = game->combatState(this);

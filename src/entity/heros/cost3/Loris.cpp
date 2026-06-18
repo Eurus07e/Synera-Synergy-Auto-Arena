@@ -26,6 +26,7 @@ Loris::Loris()
     m_state = UnitState::Idle;
 }
 
+// 技能：皮城争斗。洛里斯获得4秒护盾，对目标造成伤害并眩晕1.25秒。
 void Loris::castSkill(Game* game, Unit* target)
 {
     CombatUnitState& casterState = game->combatState(this);

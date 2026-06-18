@@ -5,11 +5,15 @@
 #include "gui/unititem.h"
 #include <QColor>
 #include <QGraphicsEllipseItem>
+#include <QGraphicsSceneMouseEvent>
 #include <QGraphicsScene>
 #include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QGraphicsRectItem>
+#include <QGraphicsTextItem>
+#include <QFont>
 #include <QPainterPath>
 #include <QPen>
 #include <QSaveFile>
@@ -19,6 +23,7 @@
 #include <random>
 #include <algorithm>
 #include <array>
+#include <functional>
 #include <limits>
 #include <utility>
 
@@ -40,17 +45,113 @@ namespace {
 constexpr qreal kZGrid = 0.0;
 constexpr qreal kZUnit = 1.0;
 constexpr qreal kZDraggingUnit = 2.0;
-constexpr qreal kBenchSlotSize = 96.0;
-constexpr qreal kBenchSlotGap = 12.0;
-constexpr qreal kPlayerBenchOffset = 60.0;
-constexpr qreal kEnemyBenchY = -170.0;
+constexpr qreal kBenchSlotSize = 80.0;
+constexpr qreal kBenchSlotGap = 6.0;
+constexpr qreal kBenchRowGap = 14.0;
+constexpr qreal kEquipmentSlotWidth = 76.0;
+constexpr qreal kEquipmentSlotHeight = 50.0;
+constexpr qreal kEquipmentSlotGap = 6.0;
+constexpr qreal kEquipmentColumnGap = 12.0;
 constexpr int kCombatTickMs = 200;
 constexpr double kCombatTickSeconds = kCombatTickMs / 1000.0;
 constexpr int kProjectileTickMs = 30;
 constexpr int kProjectileLifetimeTicks = 6;
 constexpr double kMoveCooldownSeconds = kCombatTickSeconds * 1.5;
-// 左侧空间需要为出售区留位；库存槽数量与可掉落装备种类相互独立。
 constexpr int kEquipmentSlotCount = 8;
+constexpr int kPreparationDurationSeconds = 10 * 60;
+
+qint64 euclideanDistanceSquared(const QPoint& from, const QPoint& to)
+{
+    const qint64 dx = static_cast<qint64>(from.x()) - to.x();
+    const qint64 dy = static_cast<qint64>(from.y()) - to.y();
+    return dx * dx + dy * dy;
+}
+
+std::array<QPoint, 6> hexNeighborOffsets(int row)
+{
+    if (row % 2 == 0) {
+        return {
+            QPoint(-1, 0), QPoint(1, 0), QPoint(0, -1),
+            QPoint(1, -1), QPoint(0, 1), QPoint(1, 1)
+        };
+    }
+    return {
+        QPoint(-1, 0), QPoint(1, 0), QPoint(-1, -1),
+        QPoint(0, -1), QPoint(-1, 1), QPoint(0, 1)
+    };
+}
+
+int gridIndex(const QPoint& pos)
+{
+    return pos.y() * Board::COLS + pos.x();
+}
+
+int hexGridDistance(const QPoint& from, const QPoint& to)
+{
+    if (!Board::isValidPosition(from) || !Board::isValidPosition(to)) {
+        return std::numeric_limits<int>::max();
+    }
+    if (from == to) {
+        return 0;
+    }
+
+    std::array<int, Board::ROWS * Board::COLS> distances{};
+    distances.fill(-1);
+
+    std::deque<QPoint> queue;
+    queue.push_back(from);
+    distances[static_cast<std::size_t>(gridIndex(from))] = 0;
+
+    while (!queue.empty()) {
+        const QPoint current = queue.front();
+        queue.pop_front();
+
+        const int currentDistance = distances[static_cast<std::size_t>(gridIndex(current))];
+        for (const QPoint& offset : hexNeighborOffsets(current.y())) {
+            const QPoint next = current + offset;
+            if (!Board::isValidPosition(next)) {
+                continue;
+            }
+
+            int& nextDistance = distances[static_cast<std::size_t>(gridIndex(next))];
+            if (nextDistance >= 0) {
+                continue;
+            }
+            nextDistance = currentDistance + 1;
+            if (next == to) {
+                return nextDistance;
+            }
+            queue.push_back(next);
+        }
+    }
+
+    return std::numeric_limits<int>::max();
+}
+
+class ClickableRectItem final : public QGraphicsRectItem
+{
+public:
+    ClickableRectItem(const QRectF& rect, std::function<void()> onClicked)
+        : QGraphicsRectItem(rect)
+        , m_onClicked(std::move(onClicked))
+    {
+        setAcceptedMouseButtons(Qt::LeftButton);
+    }
+
+protected:
+    void mousePressEvent(QGraphicsSceneMouseEvent* event) override
+    {
+        if (event->button() == Qt::LeftButton && m_onClicked) {
+            m_onClicked();
+            event->accept();
+            return;
+        }
+        QGraphicsRectItem::mousePressEvent(event);
+    }
+
+private:
+    std::function<void()> m_onClicked;
+};
 
 QString equipmentShortName(EquipmentType type)
 {
@@ -135,7 +236,6 @@ bool combinedEquipment(EquipmentType first, EquipmentType second, EquipmentType&
 
 const std::vector<ShopSlot>& shopPool()
 {
-    // Static shop data stays in this implementation file so Game's header only exposes the public model.
     static const std::vector<ShopSlot> kShopPool = {
          {HeroType::JarvanIV, "Jarvan IV", 1, 1, 700, 700, 55, 1, 100, 30, 40, 40, 0.60, 0.25, UnitPositionType::Frontline, {Origin::Demacia}, {Role::Guardian}, "德邦军旗：获得持续4秒的护盾，并给全场友军增加持续4秒的攻速。\nShield: 350 / 425 / 500\nAttack Speed Bonus: 20% / 25% / 50%"}
         ,{HeroType::Jhin, "Jhin", 1, 1, 444, 444, 44, 4, 70, 0, 30, 30, 0.70, 0.25, UnitPositionType::Backline, {Origin::Ionia}, {Role::Gunner, Role::Sniper}, "完美谢幕：接下来4次普攻攻速设为1并获得无限射程，普攻替换为加农炮击；第4炮额外造成144%伤害。\nBase Damage: 155 / 235 / 350\nAbility Scaling: 15 / 22 / 34"}
@@ -192,6 +292,7 @@ const ShopSlot* randomCostOneShopSlot()
     return costOneSlots[static_cast<std::size_t>(dist(rng))];
 }
 
+    //连败理赔金币
 int lossStreakCompensation(int lossStreak)
 {
     if (lossStreak < 2) {
@@ -206,6 +307,7 @@ int lossStreakCompensation(int lossStreak)
     return 8;
 }
 
+    //利息机制
 int interestForGold(int gold)
 {
     constexpr int kInterestCap = 5;
@@ -243,6 +345,7 @@ Game::Game(QObject* parent)
     , m_scene(new QGraphicsScene(this))
     , m_combatTimer(new QTimer(this))
     , m_projectileTimer(new QTimer(this))
+    , m_preparationTimer(new QTimer(this))
     , m_sellZoneItem(nullptr)
     , m_sellZoneText(nullptr)
     , m_dragActive(false)
@@ -251,13 +354,14 @@ Game::Game(QObject* parent)
     , m_sourceBenchSlot(-1)
     , m_rows(Board::ROWS)
     , m_cols(Board::COLS)
-    , m_radius(46.0)
-    , m_rowSpacing(69.0)
+    , m_radius(50.0)
+    , m_rowSpacing(75.0)
     , m_nextEquipmentId(0)
     , m_playerInterestGoldSnapshot(0)
     , m_enemyInterestGoldSnapshot(0)
     , m_enemyPreparationDone(false)
     , m_gameOver(false)
+    , m_preparationRemainingSeconds(kPreparationDurationSeconds)
     , m_phase(GamePhase::Preparation)
 {
     m_combatTimer->setInterval(kCombatTickMs);
@@ -267,6 +371,20 @@ Game::Game(QObject* parent)
     m_projectileTimer->setInterval(kProjectileTickMs);
     connect(m_projectileTimer, &QTimer::timeout, this, [this]() {
         updateAttackProjectiles();
+    });
+    m_preparationTimer->setInterval(1000);
+    connect(m_preparationTimer, &QTimer::timeout, this, [this]() {
+        if (m_phase != GamePhase::Preparation || m_gameOver) {
+            return;
+        }
+        if (m_preparationRemainingSeconds > 0) {
+            --m_preparationRemainingSeconds;
+        }
+        if (m_preparationRemainingSeconds <= 0) {
+            beginCombat(true);
+            return;
+        }
+        emit stateChanged();
     });
 }
 
@@ -307,8 +425,8 @@ void Game::reset()
     m_enemyPreparationDone = false;
     m_gameOver = false;
     m_phase = GamePhase::Preparation;
+    resetPreparationTimer();
 
-    // Reset 代表新一局开始：旧英雄和旧图形 item 都要删除，避免已购买英雄被带到下一局。
     for (UnitItem* item : m_unitItems) {
         if (m_scene != nullptr) {
             m_scene->removeItem(item);
@@ -357,6 +475,7 @@ void Game::reset()
     rollShop();
     rollShopFor(m_enemyShopSlots);
     runEnemyPrepareAgent();
+    startPreparationTimer();
     syncFromState();
     emit stateChanged();
 }
@@ -368,6 +487,7 @@ bool Game::saveGame(const QString& filePath, QString* errorMessage) const
     root["phase"] = static_cast<int>(m_phase);
     root["gameOver"] = m_gameOver;
     root["enemyPreparationDone"] = m_enemyPreparationDone;
+    root["preparationRemainingSeconds"] = m_preparationRemainingSeconds;
     root["nextEquipmentId"] = m_nextEquipmentId;
     root["playerInterestGoldSnapshot"] = m_playerInterestGoldSnapshot;
     root["enemyInterestGoldSnapshot"] = m_enemyInterestGoldSnapshot;
@@ -579,6 +699,7 @@ bool Game::loadGame(const QString& filePath, QString* errorMessage)
         ? GamePhase::Combat : GamePhase::Preparation;
     m_gameOver = root["gameOver"].toBool(false);
     m_enemyPreparationDone = root["enemyPreparationDone"].toBool(true);
+    m_preparationRemainingSeconds = root["preparationRemainingSeconds"].toInt(kPreparationDurationSeconds);
     m_nextEquipmentId = root["nextEquipmentId"].toInt(0);
     m_playerInterestGoldSnapshot = root["playerInterestGoldSnapshot"].toInt(0);
     m_enemyInterestGoldSnapshot = root["enemyInterestGoldSnapshot"].toInt(0);
@@ -1183,8 +1304,22 @@ void Game::buildScene()
         }
     }
 
+    const QRectF boardBounds = totalBounds;
+
     for (Unit* unit : std::as_const(m_units)) {
         createUnitItem(unit);
+    }
+
+    for (int i = 0; i < Bench::SLOTS; ++i) {
+        const QRectF rect = benchSlotRect(i, true);
+        auto* slotItem = m_scene->addRect(
+            rect,
+            QPen(QColor(170, 120, 130), 2),
+            QColor(55, 40, 45)
+        );
+        slotItem->setZValue(kZGrid);
+        m_enemyBenchSlotItems.push_back(slotItem);
+        totalBounds = totalBounds.united(rect);
     }
 
     for (int i = 0; i < Bench::SLOTS; ++i) {
@@ -1199,38 +1334,43 @@ void Game::buildScene()
         totalBounds = totalBounds.united(rect);
     }
 
-    const QRectF boardBounds = totalBounds;
-    auto* equipmentTitle = m_scene->addText("装备");
-    QFont equipmentTitleFont = equipmentTitle->font();
-    equipmentTitleFont.setPointSize(13);
-    equipmentTitleFont.setBold(true);
-    equipmentTitle->setFont(equipmentTitleFont);
-    equipmentTitle->setDefaultTextColor(QColor(236, 211, 134));
-    constexpr qreal equipmentColumnXOffset = 98.0;
-    equipmentTitle->setPos(boardBounds.left() - equipmentColumnXOffset, boardBounds.top() - 38.0);
-    totalBounds = totalBounds.united(equipmentTitle->sceneBoundingRect());
+    const qreal equipmentColumnX = boardBounds.left() - kEquipmentColumnGap - kEquipmentSlotWidth;
+    const QRectF atlasRect(equipmentColumnX,
+                           boardBounds.top(),
+                           kEquipmentSlotWidth,
+                           kEquipmentSlotHeight);
+    auto* atlasSlot = new ClickableRectItem(atlasRect, [this]() {
+        emit equipmentAtlasRequested();
+    });
+    atlasSlot->setPen(QPen(QColor(155, 130, 75), 1.8));
+    atlasSlot->setBrush(QColor(38, 41, 53));
+    atlasSlot->setZValue(kZGrid);
+    m_scene->addItem(atlasSlot);
+    totalBounds = totalBounds.united(atlasRect);
+
+    auto* atlasText = m_scene->addText("装备\n图谱");
+    QFont atlasFont = atlasText->font();
+    atlasFont.setPointSize(12);
+    atlasFont.setBold(true);
+    atlasText->setFont(atlasFont);
+    atlasText->setDefaultTextColor(QColor(240, 211, 122));
+    const QRectF atlasTextBounds = atlasText->boundingRect();
+    atlasText->setPos(atlasRect.center().x() - atlasTextBounds.width() * 0.5,
+                      atlasRect.center().y() - atlasTextBounds.height() * 0.5);
+    atlasText->setAcceptedMouseButtons(Qt::NoButton);
+    atlasText->setZValue(kZGrid + 0.3);
+    totalBounds = totalBounds.united(atlasText->sceneBoundingRect());
 
     for (int i = 0; i < kEquipmentSlotCount; ++i) {
-        // 装备栏采用单列展示，掉落顺序自上而下排列，便于直接观察与拖拽。
-        const QRectF rect(boardBounds.left() - equipmentColumnXOffset,
-                          boardBounds.top() + i * 58.0,
-                          76.0,
-                          50.0);
+        // 装备图谱占据装备列最上方；实际掉落装备从第二格开始自上而下排列。
+        const QRectF rect(equipmentColumnX,
+                          atlasRect.bottom() + kEquipmentSlotGap
+                              + i * (kEquipmentSlotHeight + kEquipmentSlotGap),
+                          kEquipmentSlotWidth,
+                          kEquipmentSlotHeight);
         auto* slot = m_scene->addRect(rect, QPen(QColor(110, 100, 75), 1.5), QColor(39, 40, 45));
         slot->setZValue(kZGrid);
         m_equipmentSlotItems.push_back(slot);
-        totalBounds = totalBounds.united(rect);
-    }
-
-    for (int i = 0; i < Bench::SLOTS; ++i) {
-        const QRectF rect = benchSlotRect(i, true);
-        auto* slotItem = m_scene->addRect(
-            rect,
-            QPen(QColor(170, 120, 130), 2),
-            QColor(55, 40, 45)
-        );
-        slotItem->setZValue(kZGrid);
-        m_enemyBenchSlotItems.push_back(slotItem);
         totalBounds = totalBounds.united(rect);
     }
 
@@ -1263,7 +1403,7 @@ void Game::buildScene()
     m_sellZoneText->setZValue(kZGrid + 0.3);
     totalBounds = totalBounds.united(m_sellZoneText->sceneBoundingRect());
 
-    m_scene->setSceneRect(totalBounds.adjusted(0, -40, 40, 40));
+    m_scene->setSceneRect(totalBounds.adjusted(-4, -16, 20, 20));
 }
 
 void Game::syncFromState()
@@ -1281,7 +1421,7 @@ void Game::syncFromState()
         if (benchSlot >= 0) {
             item->setVisible(true);
             item->setGridPos(QPoint(-1, -1));
-            item->setPos(benchSlotCenter(benchSlot, false) - item->boundingRect().center());
+            item->setPos(benchSlotCenter(benchSlot, false));
             item->setZValue(kZUnit);
             item->update();
             continue;
@@ -1291,7 +1431,7 @@ void Game::syncFromState()
         if (enemyBenchSlot >= 0) {
             item->setVisible(true);
             item->setGridPos(QPoint(-1, -1));
-            item->setPos(benchSlotCenter(enemyBenchSlot, true) - item->boundingRect().center());
+            item->setPos(benchSlotCenter(enemyBenchSlot, true));
             item->setZValue(kZUnit);
             item->update();
             continue;
@@ -1362,7 +1502,9 @@ QRectF Game::benchSlotRect(int slot, bool enemyBench) const
     constexpr qreal benchWidth = Bench::SLOTS * kBenchSlotSize + (Bench::SLOTS - 1) * kBenchSlotGap;
     const qreal startX = boardBounds.center().x() - benchWidth * 0.5;
     const qreal x = startX + slot * (kBenchSlotSize + kBenchSlotGap);
-    const qreal y = enemyBench ? kEnemyBenchY : Board::ROWS * m_rowSpacing + kPlayerBenchOffset;
+    const qreal y = enemyBench
+        ? boardBounds.top() - kBenchRowGap - kBenchSlotSize
+        : boardBounds.bottom() + kBenchRowGap;
     return {x, y, kBenchSlotSize, kBenchSlotSize};
 }
 
@@ -1805,7 +1947,7 @@ void Game::tryDropBasicEquipment()
     }
     static std::mt19937 rng(std::random_device{}());
     std::uniform_int_distribution<int> chance(1, 100);
-    if (chance(rng) > 30) {
+    if (chance(rng) > 90) {
         return;
     }
 
@@ -1840,24 +1982,7 @@ bool Game::canStartCombat() const
 
 bool Game::startCombat()
 {
-    if (m_phase == GamePhase::Combat)
-    {
-        return false;
-    }
-
-    if (!canStartCombat()) {
-        return false;
-    }
-
-    // 当前流程由玩家手动开始战斗，此刻锁定金币，战斗中消费不改变本轮利息。
-    m_playerInterestGoldSnapshot = m_player.gold();
-    m_enemyInterestGoldSnapshot = m_enemy.gold();
-    resetCombatState();
-    setupCombatCopies();
-    m_phase = GamePhase::Combat;
-    m_combatTimer->start();
-    emit stateChanged();
-    return true;
+    return beginCombat(false);
 }
 
 bool Game::endCombat()
@@ -1871,6 +1996,54 @@ bool Game::endCombat()
     resetCombatState();
     cleanupCombatCopies();
     restorePreparationBoard();
+    resetPreparationTimer();
+    startPreparationTimer();
+    emit stateChanged();
+    return true;
+}
+
+bool Game::beginCombat(bool forced)
+{
+    if (m_phase == GamePhase::Combat) {
+        return false;
+    }
+
+    if (forced) {
+        for (int slot = 0; slot < Bench::SLOTS && deployedPlayerUnitCount() < m_player.unitCap(); ++slot) {
+            Unit* unit = m_bench.getUnitAt(slot);
+            if (unit == nullptr || unit->owner() != Owner::PlayerCtrl) {
+                continue;
+            }
+
+            for (int row = Board::ROWS / 2; row < Board::ROWS; ++row) {
+                bool placed = false;
+                for (int col = 0; col < Board::COLS; ++col) {
+                    const QPoint target(col, row);
+                    if (!m_board.hasUnitAt(target)) {
+                        applyDrop(unit->id(), target);
+                        placed = true;
+                        break;
+                    }
+                }
+                if (placed) {
+                    break;
+                }
+            }
+        }
+    }
+
+    if (!canStartCombat()) {
+        return false;
+    }
+
+    // 当前流程由玩家手动开始战斗，此刻锁定金币，战斗中消费不改变本轮利息。
+    m_playerInterestGoldSnapshot = m_player.gold();
+    m_enemyInterestGoldSnapshot = m_enemy.gold();
+    stopPreparationTimer();
+    resetCombatState();
+    setupCombatCopies();
+    m_phase = GamePhase::Combat;
+    m_combatTimer->start();
     emit stateChanged();
     return true;
 }
@@ -2179,7 +2352,7 @@ Unit* Game::findNearestEnemy(const Unit* attacker) const
     Unit* bestTarget = nullptr;
 
     QList<Unit*> enemies = deployedUnits(enemyOwner);
-    int bestDistanceSquared = std::numeric_limits<int>::max();
+    qint64 bestDistance = std::numeric_limits<qint64>::max();
     for (Unit* enemy : std::as_const(enemies))
     {
         if (enemy == nullptr)
@@ -2189,18 +2362,16 @@ Unit* Game::findNearestEnemy(const Unit* attacker) const
 
         const QPoint attackerPos = attacker->position();
         const QPoint enemyPos = enemy->position();
-        const int dx = attackerPos.x() - enemyPos.x();
-        const int dy = attackerPos.y() - enemyPos.y();
-        const int distanceSquared = dx * dx + dy * dy;
+        const qint64 distance = euclideanDistanceSquared(attackerPos, enemyPos);
         const QPoint selectedPos = bestTarget == nullptr ? QPoint() : bestTarget->position();
         const bool preferredTieBreak = bestTarget == nullptr
             || enemy->hp() > bestTarget->hp()
             || (enemy->hp() == bestTarget->hp() && enemyPos.x() < selectedPos.x())
             || (enemy->hp() == bestTarget->hp() && enemyPos.x() == selectedPos.x()
                 && enemyPos.y() > selectedPos.y());
-        if (distanceSquared < bestDistanceSquared
-            || (distanceSquared == bestDistanceSquared && preferredTieBreak)) {
-            bestDistanceSquared = distanceSquared;
+        if (distance < bestDistance
+            || (distance == bestDistance && preferredTieBreak)) {
+            bestDistance = distance;
             bestTarget = enemy;
         }
     }
@@ -2221,15 +2392,11 @@ bool Game::isInAttackRange(const Unit* attacker, const Unit* target) const
     const QPoint attackerPos = attacker->position();
     const QPoint targetPos = target->position();
 
-    const int dx = attackerPos.x() - targetPos.x();
-    const int dy = attackerPos.y() - targetPos.y();
-    const int distanceSquared = dx * dx + dy * dy;
-
     const CombatUnitState* status = combatState(attacker);
     const bool jhinEmpowered = attacker->heroType() == static_cast<int>(HeroType::Jhin)
         && status != nullptr && status->empoweredShots > 0;
     const int range = jhinEmpowered ? Board::ROWS + Board::COLS : attacker->range();
-    return distanceSquared <= range * range;
+    return hexGridDistance(attackerPos, targetPos) <= range;
 }
 
 void Game::dealDamage(Unit* target, int damage)
@@ -2269,9 +2436,7 @@ QList<Unit*> Game::skillAreaTargets(const Unit* target, Owner targetOwner, int m
         if (candidate == nullptr || candidate == target) {
             continue;
         }
-        const int dx = candidate->position().x() - center.x();
-        const int dy = candidate->position().y() - center.y();
-        if (dx * dx + dy * dy <= 2) {
+        if (hexGridDistance(candidate->position(), center) <= 1) {
             targets.append(candidate);
             if (maximumTargets > 0 && targets.size() >= maximumTargets) {
                 break;
@@ -2566,6 +2731,7 @@ void Game::finishCombat(Owner winner)
     cleanupCombatCopies();
     restorePreparationBoard();
     m_phase = GamePhase::Preparation;
+    resetPreparationTimer();
 
     constexpr int kBaseRoundReward = 4;
     const int roundReward = kBaseRoundReward + qMax(0, m_player.round() - 1);
@@ -2600,6 +2766,7 @@ void Game::finishCombat(Owner winner)
 
     if (m_player.isDead() || m_enemy.isDead()) {
         m_gameOver = true;
+        stopPreparationTimer();
         syncFromState();
         emit stateChanged();
         emit gameFinished(!m_player.isDead());
@@ -2612,6 +2779,7 @@ void Game::finishCombat(Owner winner)
     rollShop();
     rollShopFor(m_enemyShopSlots);
     runEnemyPrepareAgent();
+    startPreparationTimer();
 
     syncFromState();
     emit stateChanged();
@@ -2712,6 +2880,25 @@ void Game::clearAttackProjectiles()
     m_attackProjectiles.clear();
 }
 
+void Game::startPreparationTimer()
+{
+    if (m_preparationTimer != nullptr && !m_gameOver && m_phase == GamePhase::Preparation) {
+        m_preparationTimer->start();
+    }
+}
+
+void Game::stopPreparationTimer()
+{
+    if (m_preparationTimer != nullptr) {
+        m_preparationTimer->stop();
+    }
+}
+
+void Game::resetPreparationTimer()
+{
+    m_preparationRemainingSeconds = kPreparationDurationSeconds;
+}
+
 void Game::moveUnitTowardTarget(Unit* unit, const Unit* target)
 {
     if (unit == nullptr || target == nullptr || !isUnitOnBoard(unit) || !isUnitOnBoard(target)) {
@@ -2723,67 +2910,54 @@ void Game::moveUnitTowardTarget(Unit* unit, const Unit* target)
     const int attackRange = unit->range();
 
     // 如果已在攻击范围内则无需移动
-    const int startDx = start.x() - targetPos.x();
-    const int startDy = start.y() - targetPos.y();
-    if (startDx * startDx + startDy * startDy <= attackRange * attackRange) {
+    const int startDistance = hexGridDistance(start, targetPos);
+    if (startDistance <= attackRange) {
         return;
     }
 
-    // BFS 寻路：找到离目标攻击范围内最近的可行格子
-    static constexpr std::array<QPoint, 6> kDirections = {
-        QPoint(1, 0), QPoint(-1, 0), QPoint(0, 1),
-        QPoint(0, -1), QPoint(1, 1), QPoint(-1, -1)
-    };
-
     std::unordered_map<int, QPoint> parent; // 用线性索引记录前驱
-    auto key = [](const QPoint& p) { return p.x() * 100 + p.y(); };
     std::deque<QPoint> queue;
     queue.push_back(start);
-    parent[key(start)] = start;
+    parent[gridIndex(start)] = start;
 
     QPoint bestGoal = start;
-    int bestDistSq = startDx * startDx + startDy * startDy;
-    bool found = false;
+    int bestDistance = startDistance;
+    bool foundAttackCell = false;
 
     while (!queue.empty()) {
         const QPoint cur = queue.front();
         queue.pop_front();
 
-        const int dx = cur.x() - targetPos.x();
-        const int dy = cur.y() - targetPos.y();
-        const int distSq = dx * dx + dy * dy;
-
-        // 到达目标攻击范围内，选距离最近的
-        if (distSq <= attackRange * attackRange && distSq < bestDistSq) {
-            bestDistSq = distSq;
+        const int distance = hexGridDistance(cur, targetPos);
+        const bool inAttackRange = distance <= attackRange;
+        if ((inAttackRange && (!foundAttackCell || distance < bestDistance))
+            || (!foundAttackCell && distance < bestDistance)) {
+            bestDistance = distance;
             bestGoal = cur;
-            found = true;
-            continue; // BFS 仍在同层搜索更优目标
+            foundAttackCell = inAttackRange;
+            if (foundAttackCell) {
+                continue;
+            }
         }
 
-        // 如果已找到目标且当前层比最佳更远，可以提前停止
-        if (found && distSq >= bestDistSq) {
-            continue;
-        }
-
-        for (const QPoint& d : kDirections) {
-            const QPoint next = cur + d;
+        for (const QPoint& offset : hexNeighborOffsets(cur.y())) {
+            const QPoint next = cur + offset;
             if (!Board::isValidPosition(next)) continue;
             if (m_board.hasUnitAt(next) && next != start) continue;
-            if (parent.count(key(next))) continue; // 已访问
-            parent[key(next)] = cur;
+            if (parent.count(gridIndex(next))) continue; // 已访问
+            parent[gridIndex(next)] = cur;
             queue.push_back(next);
         }
     }
 
-    if (!found || bestGoal == start) {
+    if (bestGoal == start) {
         return;
     }
 
     // 回溯路径，取第一步
     QPoint step = bestGoal;
-    while (parent[key(step)] != start) {
-        step = parent[key(step)];
+    while (parent[gridIndex(step)] != start) {
+        step = parent[gridIndex(step)];
     }
 
     m_board.removeUnit(unit);
@@ -2819,8 +2993,8 @@ int Game::enemyUnitScore(const Unit* unit) const
         }
     }
 
-    return unit->cost() * 100 + unit->star() * 250 + unit->maxHp() / 10
-        + unit->atk() + matchingPeers * 180;
+    return unit->cost() * 220 + unit->star() * 650 + unit->maxHp() / 8
+        + unit->atk() * 3 + matchingPeers * 260;
 }
 
 int Game::enemyShopSlotScore(const ShopSlot& slot) const
@@ -2835,8 +3009,10 @@ int Game::enemyShopSlotScore(const ShopSlot& slot) const
         }
     }
 
-    const int mergeBonus = matchingUnits >= 2 ? 1000 : matchingUnits * 180;
-    return slot.cost * 100 + slot.star * 250 + slot.maxHp / 10 + slot.atk + mergeBonus;
+    const int mergeBonus = matchingUnits >= 2 ? 2400 : matchingUnits * 420;
+    const int lateRoundBonus = qMax(0, m_enemy.round() - 10) * slot.cost * 22;
+    return slot.cost * 220 + slot.star * 650 + slot.maxHp / 8 + slot.atk * 3
+        + mergeBonus + lateRoundBonus;
 }
 
 Unit* Game::weakestEnemyBenchUnit() const
@@ -2881,8 +3057,8 @@ bool Game::makeRoomForEnemyShopSlot(const ShopSlot& slot)
         return false;
     }
 
-    constexpr int kRequiredImprovement = 100;
-    if (enemyShopSlotScore(slot) < enemyUnitScore(weakest) + kRequiredImprovement) {
+    const int requiredImprovement = m_enemy.round() >= 12 || m_enemy.gold() >= 40 ? -120 : 100;
+    if (enemyShopSlotScore(slot) < enemyUnitScore(weakest) + requiredImprovement) {
         return false;
     }
 
@@ -2988,6 +3164,62 @@ void Game::arrangeEnemyFormation()
     }
 }
 
+void Game::optimizeEnemyLineup()
+{
+    QList<Unit*> enemyUnits;
+    for (Unit* unit : m_units) {
+        if (unit != nullptr && unit->owner() == Owner::EnemyCtrl) {
+            enemyUnits.append(unit);
+        }
+    }
+    if (enemyUnits.isEmpty()) {
+        return;
+    }
+
+    std::sort(enemyUnits.begin(), enemyUnits.end(), [this](const Unit* lhs, const Unit* rhs) {
+        const int lhsScore = enemyUnitScore(lhs);
+        const int rhsScore = enemyUnitScore(rhs);
+        if (lhsScore != rhsScore) {
+            return lhsScore > rhsScore;
+        }
+        return lhs != nullptr && rhs != nullptr && lhs->id() < rhs->id();
+    });
+
+    for (Unit* unit : enemyUnits) {
+        m_board.removeUnit(unit);
+        m_enemyBench.removeUnit(unit);
+        unit->setPosition(QPoint(-1, -1));
+    }
+
+    const int deployLimit = qMin(m_enemy.unitCap(), static_cast<int>(enemyUnits.size()));
+    for (int index = 0; index < deployLimit; ++index) {
+        Unit* unit = enemyUnits[index];
+        QPoint target = preferredEnemyDeployPosition(unit);
+        if (!Board::isValidPosition(target)) {
+            target = fallbackEnemyDeployPosition();
+        }
+        if (Board::isValidPosition(target)) {
+            m_board.addUnit(unit, target);
+        }
+    }
+
+    QList<Unit*> overflow;
+    for (int index = deployLimit; index < enemyUnits.size(); ++index) {
+        Unit* unit = enemyUnits[index];
+        if (!m_enemyBench.addUnit(unit)) {
+            overflow.append(unit);
+        }
+    }
+
+    for (Unit* unit : overflow) {
+        const int proceeds = unit != nullptr ? unit->cost() : 0;
+        if (proceeds > 0) {
+            m_enemy.addGold(proceeds);
+        }
+        removeUnitCompletely(unit);
+    }
+}
+
 QPoint Game::fallbackEnemyDeployPosition() const
 {
     for (int row = Board::ROWS / 2 - 1; row >= 0; --row) {
@@ -3043,48 +3275,60 @@ void Game::runEnemyPrepareAgent()
         }
     }
 
-    // 先部署当前备战席单位，优先用空位购买新牌，只有部署已满才触发替换出售。
-    for (int slot = 0; slot < Bench::SLOTS; ++slot) {
-        Unit* unit = m_enemyBench.getUnitAt(slot);
-        if (unit != nullptr) {
-            deployEnemyUnitFromBench(unit);
-        }
-    }
+    optimizeEnemyLineup();
 
-    for (int pass = 0; pass < 5; ++pass) {
+    const bool lateGame = m_enemy.round() >= 12 || m_enemy.level() >= 8;
+    const int reserveGold = lateGame ? (m_enemy.gold() >= 60 ? 0 : 4) : 12;
+    const int maxOperations = lateGame ? 48 : 18;
+    int staleRefreshes = 0;
+
+    for (int pass = 0; pass < maxOperations && m_enemy.gold() > reserveGold; ++pass) {
         bool bought = false;
-        int bestShopIndex = -1;
-        int bestShopScore = -1;
+        std::vector<int> candidateIndexes;
         for (int i = 0; i < static_cast<int>(m_enemyShopSlots.size()); ++i) {
             const ShopSlot& slot = m_enemyShopSlots[static_cast<std::size_t>(i)];
-            if (m_enemy.gold() >= slot.cost) {
-                const int score = enemyShopSlotScore(slot);
-                if (score > bestShopScore) {
-                    bestShopScore = score;
-                    bestShopIndex = i;
-                }
+            if (m_enemy.gold() < slot.cost || m_enemy.gold() - slot.cost < reserveGold) {
+                continue;
             }
+            candidateIndexes.push_back(i);
         }
-        if (bestShopIndex >= 0) {
-            bought = buyEnemyShopUnit(bestShopIndex);
+
+        std::sort(candidateIndexes.begin(), candidateIndexes.end(), [this](int lhs, int rhs) {
+            const ShopSlot& lhsSlot = m_enemyShopSlots[static_cast<std::size_t>(lhs)];
+            const ShopSlot& rhsSlot = m_enemyShopSlots[static_cast<std::size_t>(rhs)];
+            const int lhsScore = enemyShopSlotScore(lhsSlot);
+            const int rhsScore = enemyShopSlotScore(rhsSlot);
+            if (lhsScore != rhsScore) {
+                return lhsScore > rhsScore;
+            }
+            return lhs < rhs;
+        });
+
+        for (int shopIndex : candidateIndexes) {
+            if (buyEnemyShopUnit(shopIndex)) {
+                bought = true;
+                break;
+            }
         }
 
         if (!bought) {
-            if (m_enemy.gold() >= 12 && refreshEnemyShop()) {
+            ++staleRefreshes;
+            if (m_enemy.gold() - 4 >= reserveGold
+                && (lateGame || staleRefreshes <= 2)
+                && refreshEnemyShop()) {
                 continue;
             }
             break;
         }
-    }
 
-    for (int slot = 0; slot < Bench::SLOTS; ++slot) {
-        Unit* unit = m_enemyBench.getUnitAt(slot);
-        if (unit != nullptr) {
-            deployEnemyUnitFromBench(unit);
+        staleRefreshes = 0;
+        optimizeEnemyLineup();
+        if (m_enemyShopSlots.empty() && m_enemy.gold() - 4 >= reserveGold) {
+            refreshEnemyShop();
         }
     }
 
-    arrangeEnemyFormation();
+    optimizeEnemyLineup();
     m_enemyPreparationDone = true;
     syncFromState();
     emit stateChanged();

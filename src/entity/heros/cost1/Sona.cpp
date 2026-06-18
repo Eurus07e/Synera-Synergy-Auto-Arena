@@ -26,6 +26,7 @@ Sona::Sona()
     m_state = UnitState::Idle;
 }
 
+// 技能：能量和弦。对目标附近最多2名敌人造成魔法伤害，并治疗当前生命值最低的友军。
 void Sona::castSkill(Game* game, Unit* target)
 {
     CombatUnitState& casterState = game->combatState(this);

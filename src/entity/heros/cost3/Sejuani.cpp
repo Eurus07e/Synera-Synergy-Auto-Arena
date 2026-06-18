@@ -26,6 +26,7 @@ Sejuani::Sejuani()
     m_state = UnitState::Idle;
 }
 
+// 技能：凛冬之怒。瑟庄妮获得4秒护盾，对目标附近敌人造成伤害和冰冷；若主目标已被冰冷，则额外眩晕。
 void Sejuani::castSkill(Game* game, Unit* target)
 {
     CombatUnitState& casterState = game->combatState(this);

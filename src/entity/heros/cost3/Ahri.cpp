@@ -27,6 +27,7 @@ Ahri::Ahri()
 
 }
 
+// 技能：狐火。对目标和附近最多2名敌人分别造成魔法伤害。
 void Ahri::castSkill(Game* game, Unit* target)
 {
     CombatUnitState& casterState = game->combatState(this);

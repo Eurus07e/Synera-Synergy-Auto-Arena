@@ -40,7 +40,6 @@ enum class EquipmentType
     SpearOfShojin,
     Thornmail,
     WarmogsArmor,
-    // 新装备追加在末尾，保证旧存档中已有装备的数字编号仍可读取。
     IronSword,
     HasteGloves,
     BlueCrystal
@@ -161,7 +160,6 @@ private:
     QString m_name;
     QPoint m_position;
 protected:
-    //基础属性
     int m_star;
     int m_cost;
     int m_maxHp;
@@ -181,7 +179,6 @@ protected:
     std::vector<Role> m_roles;
     std::vector<EquipmentType> m_equipment;
     UnitState m_state;
-    // 使用稳定整数标识英雄种类，使读档后的基础 Unit 仍可由 Game 执行对应技能。
     int m_heroType;
 };
 

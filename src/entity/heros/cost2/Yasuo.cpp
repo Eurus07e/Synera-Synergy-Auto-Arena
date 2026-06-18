@@ -26,6 +26,7 @@ Yasuo::Yasuo()
     m_state = UnitState::Idle;
 }
 
+// 技能：踏前斩。对目标附近区域造成伤害；若只命中一个目标，则对主目标造成双倍伤害。
 void Yasuo::castSkill(Game* game, Unit* target)
 {
     CombatUnitState& casterState = game->combatState(this);

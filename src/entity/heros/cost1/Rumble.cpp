@@ -26,6 +26,7 @@ Rumble::Rumble()
     m_state = UnitState::Idle;
 }
 
+// 技能：机械重组。兰博获得4秒护盾，并对目标附近区域内敌人造成魔法伤害。
 void Rumble::castSkill(Game* game, Unit* target)
 {
     CombatUnitState& casterState = game->combatState(this);

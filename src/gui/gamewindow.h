@@ -13,6 +13,7 @@ class QPushButton;
 class QHBoxLayout;
 class QVBoxLayout;
 class QScrollArea;
+class QVariantAnimation;
 enum class EquipmentType;
 
 class GameWindow : public QMainWindow
@@ -34,6 +35,7 @@ private:
     void fitSceneInView() const;
     void refreshStatusBar() const;
     void refreshShopPanel() const;
+    void setShopPanelExpanded(bool expanded);
     void showUnitCard(const Unit* unit);
     void showGameResult(bool playerWon);
     void showEquipmentAtlas();
@@ -43,19 +45,14 @@ private:
     QVBoxLayout* m_mainLayout;
     QHBoxLayout* m_contentLayout;
     QGraphicsView* m_view;
-    QPushButton* m_equipmentAtlasButton;
     QScrollArea* m_shopScrollArea;
     QWidget* m_shopPanel;
     QLabel* m_topRoundLabel;
+    QPushButton* m_shopToggleButton;
     QLabel* m_enemyStatusLabel;
     QLabel* m_synergyStatusLabel;
     QLabel* m_shopTitleLabel;
     std::array<QPushButton*, 5> m_shopCards;
-    std::array<QLabel*, 5> m_shopNameLabels;
-    std::array<QLabel*, 5> m_shopMetaLabels;
-    std::array<QLabel*, 5> m_shopStatsLabels;
-    std::array<QLabel*, 5> m_shopTraitsLabels;
-    std::array<QLabel*, 5> m_shopSkillLabels;
     QPushButton* m_refreshShopButton;
     QPushButton* m_resetButton;
     QPushButton* m_saveButton;
@@ -65,6 +62,9 @@ private:
     QLabel* m_goldStatusLabel;
     QPushButton* m_levelStatusButton;
     QLabel* m_roundStatusLabel;
+    QLabel* m_phaseStatusLabel;
+    QVariantAnimation* m_shopPanelAnimation = nullptr;
+    bool m_shopPanelExpanded = true;
     std::unique_ptr<Game> m_game;
 };
 

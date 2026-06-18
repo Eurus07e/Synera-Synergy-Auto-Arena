@@ -26,6 +26,7 @@ Ashe::Ashe()
     m_state = UnitState::Idle;
 }
 
+// 技能：臻冰之箭。对目标造成主伤害和3秒冰冷，并对目标附近敌人造成溅射伤害和冰冷。
 void Ashe::castSkill(Game* game, Unit* target)
 {
     CombatUnitState& casterState = game->combatState(this);

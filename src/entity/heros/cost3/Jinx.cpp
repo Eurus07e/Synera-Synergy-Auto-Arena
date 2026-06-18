@@ -26,6 +26,7 @@ Jinx::Jinx()
     m_state = UnitState::Idle;
 }
 
+// 技能：枪炮交响曲。金克丝主要是被动英雄；普攻计数和火箭弹逻辑在 Game::performAttack() 中处理。
 void Jinx::castSkill(Game* game, Unit* target)
 {
     CombatUnitState& casterState = game->combatState(this);

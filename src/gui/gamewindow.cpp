@@ -2,25 +2,151 @@
 #include "core/game.h"
 #include "core/player.h"
 #include "entity/unit/unit.h"
+#include <QContextMenuEvent>
+#include <QCoreApplication>
 #include <QDialog>
 #include <QDir>
+#include <QEasingCurve>
+#include <QFileInfo>
 #include <QFrame>
+#include <QFontMetrics>
 #include <QGridLayout>
 #include <QGraphicsView>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QLinearGradient>
 #include <QMessageBox>
+#include <QMouseEvent>
+#include <QNativeGestureEvent>
 #include <QPainter>
+#include <QPainterPath>
+#include <QPixmap>
 #include <QPushButton>
 #include <QResizeEvent>
 #include <QScrollArea>
+#include <QScrollBar>
 #include <QSizePolicy>
 #include <QStandardPaths>
 #include <QStringList>
+#include <QTimer>
+#include <QVariantAnimation>
 #include <QVBoxLayout>
+#include <QWheelEvent>
+#include <cmath>
 #include <memory>
 
 namespace {
+constexpr int kShopPanelExpandedHeight = 276;
+constexpr int kShopPanelAnimationMs = 180;
+
+class ZoomableGraphicsView : public QGraphicsView
+{
+public:
+    explicit ZoomableGraphicsView(QWidget* parent = nullptr)
+        : QGraphicsView(parent)
+    {
+    }
+
+protected:
+    bool event(QEvent* event) override
+    {
+        return handleNativeGesture(event) || QGraphicsView::event(event);
+    }
+
+    bool viewportEvent(QEvent* event) override
+    {
+        return handleNativeGesture(event) || QGraphicsView::viewportEvent(event);
+    }
+
+    void wheelEvent(QWheelEvent* event) override
+    {
+        if (event->modifiers().testFlag(Qt::ControlModifier)
+            || event->modifiers().testFlag(Qt::MetaModifier)) {
+            applyWheelZoom(event);
+            return;
+        }
+
+        panByWheel(event);
+    }
+
+private:
+    bool handleNativeGesture(QEvent* event)
+    {
+        if (event->type() != QEvent::NativeGesture) {
+            return false;
+        }
+
+        auto* gesture = static_cast<QNativeGestureEvent*>(event);
+        if (gesture->gestureType() != Qt::ZoomNativeGesture) {
+            return false;
+        }
+
+        applyZoom(std::exp(gesture->value()), gesture);
+        return true;
+    }
+
+    void applyZoom(qreal requestedFactor, QInputEvent* event)
+    {
+        constexpr qreal minScale = 0.55;
+        constexpr qreal maxScale = 2.30;
+
+        const qreal currentScale = transform().m11();
+        if (currentScale <= 0.0 || requestedFactor <= 0.0) {
+            event->ignore();
+            return;
+        }
+
+        const qreal wantedScale = qBound(minScale, currentScale * requestedFactor, maxScale);
+        const qreal factor = wantedScale / currentScale;
+        if (qFuzzyCompare(factor, 1.0)) {
+            event->accept();
+            return;
+        }
+
+        setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
+        scale(factor, factor);
+        setTransformationAnchor(QGraphicsView::AnchorViewCenter);
+        event->accept();
+    }
+
+    void applyWheelZoom(QWheelEvent* event)
+    {
+        constexpr qreal zoomBase = 1.15;
+        const qreal delta = !event->angleDelta().isNull()
+            ? static_cast<qreal>(event->angleDelta().y()) / 120.0
+            : static_cast<qreal>(event->pixelDelta().y()) / 240.0;
+        if (qFuzzyIsNull(delta)) {
+            event->ignore();
+            return;
+        }
+
+        applyZoom(std::pow(zoomBase, delta), event);
+    }
+
+    void panByWheel(QWheelEvent* event)
+    {
+        QPointF delta = event->pixelDelta();
+        if (delta.isNull()) {
+            constexpr qreal wheelStepPixels = 48.0;
+            delta = QPointF(event->angleDelta()) / 120.0 * wheelStepPixels;
+        }
+
+        if (event->modifiers().testFlag(Qt::ShiftModifier) && qFuzzyIsNull(delta.x())) {
+            delta.setX(delta.y());
+            delta.setY(0.0);
+        }
+
+        if (delta.isNull()) {
+            event->ignore();
+            return;
+        }
+
+        horizontalScrollBar()->setValue(horizontalScrollBar()->value() - qRound(delta.x()));
+        verticalScrollBar()->setValue(verticalScrollBar()->value() - qRound(delta.y()));
+        event->accept();
+    }
+};
+
 template <typename T>
 void releaseToQt(std::unique_ptr<T>& object)
 {
@@ -243,7 +369,7 @@ QString heroLocalizedName(const QString& name)
 
 QString shopStatsText(const ShopSlot& slot)
 {
-    // 商店卡牌空间较窄，双列表格能把右侧空白利用起来；中间窄列作为视觉分隔线。
+
     return QString("<table width='100%' cellspacing='0' cellpadding='1'>"
                    "<tr>"
                    "<td width='31%'>Health</td><td width='18%' align='right'>%1</td>"
@@ -413,30 +539,477 @@ QString statusButtonStyle(bool affordable)
     )").arg(background, border, hover, pressed);
 }
 
-QString shopCardStyle(bool owned)
+QString heroPortraitRelativePath(HeroType heroType)
 {
-    const QString border = owned ? "#58d17a" : "#7c8499";
-    const QString disabledBorder = owned ? "#3fa85e" : "#555b6d";
-    return QString(R"(
-        QPushButton#ShopCard {
-            background-color: #303442;
-            border: 2px solid %1;
-            border-radius: 4px;
-            text-align: left;
-        }
-        QPushButton#ShopCard:hover {
-            background-color: #383d4d;
-            border-color: %1;
-        }
-        QPushButton#ShopCard:pressed {
-            background-color: #262a36;
-        }
-        QPushButton#ShopCard:disabled {
-            background-color: #252833;
-            border-color: %2;
-        }
-    )").arg(border, disabledBorder);
+    switch (heroType) {
+    case HeroType::JarvanIV: return QStringLiteral("assets/hero_portraits/jarvan_iv.png");
+    case HeroType::Jhin: return QStringLiteral("assets/hero_portraits/jhin.png");
+    case HeroType::Rumble: return QStringLiteral("assets/hero_portraits/rumble.png");
+    case HeroType::Sona: return QStringLiteral("assets/hero_portraits/sona.png");
+    case HeroType::Ashe: return QStringLiteral("assets/hero_portraits/ashe.png");
+    case HeroType::ChoGath: return QStringLiteral("assets/hero_portraits/chogath.png");
+    case HeroType::XinZhao: return QStringLiteral("assets/hero_portraits/xin_zhao.png");
+    case HeroType::Yasuo: return QStringLiteral("assets/hero_portraits/yasuo.png");
+    case HeroType::Ahri: return QStringLiteral("assets/hero_portraits/ahri.png");
+    case HeroType::Jinx: return QStringLiteral("assets/hero_portraits/jinx.png");
+    case HeroType::Loris: return QStringLiteral("assets/hero_portraits/loris.png");
+    case HeroType::Sejuani: return QStringLiteral("assets/hero_portraits/sejuani.png");
+    }
+    return {};
 }
+
+QPixmap loadHeroPortrait(HeroType heroType)
+{
+    const QString relativePath = heroPortraitRelativePath(heroType);
+    if (relativePath.isEmpty()) {
+        return {};
+    }
+
+    const QString appDir = QCoreApplication::applicationDirPath();
+    const QString currentDir = QDir::currentPath();
+    const QString roots[] = {
+        currentDir,
+        QFileInfo(currentDir + "/..").canonicalFilePath(),
+        QFileInfo(appDir + "/..").canonicalFilePath(),
+        QFileInfo(appDir + "/../..").canonicalFilePath(),
+        QFileInfo(appDir + "/../../..").canonicalFilePath(),
+        QFileInfo(appDir + "/../../../..").canonicalFilePath()
+    };
+
+    QPixmap pixmap;
+    for (const QString& root : roots) {
+        if (root.isEmpty()) {
+            continue;
+        }
+        pixmap.load(root + "/" + relativePath);
+        if (!pixmap.isNull()) {
+            return pixmap;
+        }
+    }
+    return {};
+}
+
+QString compactTraitName(const QString& text)
+{
+    const qsizetype split = text.indexOf(' ');
+    if (split >= 0 && split + 1 < text.size()) {
+        return text.mid(split + 1);
+    }
+    return text;
+}
+
+QStringList compactTraitLines(const ShopSlot& slot)
+{
+    QStringList traits;
+    for (const Role& role : slot.roles) {
+        traits << compactTraitName(roleToText(role));
+    }
+    for (const Origin& origin : slot.origins) {
+        traits << compactTraitName(originToText(origin));
+    }
+    return traits;
+}
+
+class ShopCardButton final : public QPushButton
+{
+public:
+    explicit ShopCardButton(QWidget* parent = nullptr)
+        : QPushButton(parent)
+    {
+        setCursor(Qt::PointingHandCursor);
+        setMouseTracking(true);
+        setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+        setFixedSize(172, 244);
+        setToolTip("左键单击卡牌立即购买；右键或触控板双指点按查看详情");
+    }
+
+    void setShopSlot(const ShopSlot* slot, bool canBuy, bool alreadyOwned)
+    {
+        if (slot == nullptr) {
+            m_hasSlot = false;
+            m_detailMode = false;
+            m_portrait = {};
+            setEnabled(false);
+            setToolTip("该商店槽位已售出，刷新商店可获得新英雄");
+            update();
+            return;
+        }
+
+        const bool changedHero = !m_hasSlot
+            || m_slot.heroType != slot->heroType
+            || m_slot.heroName != slot->heroName
+            || m_slot.cost != slot->cost;
+        m_slot = *slot;
+        m_hasSlot = true;
+        m_canBuy = canBuy;
+        m_alreadyOwned = alreadyOwned;
+        setEnabled(true);
+        if (changedHero) {
+            m_detailMode = false;
+            m_portrait = loadHeroPortrait(m_slot.heroType);
+        }
+        refreshToolTip();
+        update();
+    }
+
+    [[nodiscard]] QSize sizeHint() const override
+    {
+        return {172, 244};
+    }
+
+    [[nodiscard]] QSize minimumSizeHint() const override
+    {
+        return {160, 228};
+    }
+
+protected:
+    void paintEvent(QPaintEvent*) override
+    {
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
+        if (!m_hasSlot) {
+            paintEmpty(&painter);
+            return;
+        }
+        if (m_detailMode) {
+            paintDetails(&painter);
+        } else {
+            paintSummary(&painter);
+        }
+    }
+
+    void mousePressEvent(QMouseEvent* event) override
+    {
+        if (event->button() == Qt::RightButton && m_hasSlot) {
+            m_ignoreNextContextMenu = true;
+            toggleDetailMode();
+            event->accept();
+            return;
+        }
+
+        if (event->button() != Qt::LeftButton || !m_hasSlot) {
+            QPushButton::mousePressEvent(event);
+            return;
+        }
+        m_pressed = true;
+        update();
+        event->accept();
+    }
+
+    void mouseReleaseEvent(QMouseEvent* event) override
+    {
+        if (event->button() != Qt::LeftButton || !m_hasSlot) {
+            QPushButton::mouseReleaseEvent(event);
+            return;
+        }
+
+        const bool wasPressed = m_pressed;
+        m_pressed = false;
+        update();
+        if (!wasPressed || !rect().contains(event->pos())) {
+            event->accept();
+            return;
+        }
+
+        if (m_detailMode) {
+            if (backButtonRect().contains(event->pos())) {
+                exitDetailMode();
+            }
+            event->accept();
+            return;
+        }
+
+        if (m_canBuy) {
+            click();
+        }
+        event->accept();
+    }
+
+    void mouseDoubleClickEvent(QMouseEvent* event) override
+    {
+        if (event->button() != Qt::LeftButton || !m_hasSlot) {
+            QPushButton::mouseDoubleClickEvent(event);
+            return;
+        }
+
+        if (m_detailMode) {
+            exitDetailMode();
+        }
+        event->accept();
+    }
+
+    void contextMenuEvent(QContextMenuEvent* event) override
+    {
+        if (!m_hasSlot) {
+            QPushButton::contextMenuEvent(event);
+            return;
+        }
+
+        if (m_ignoreNextContextMenu) {
+            m_ignoreNextContextMenu = false;
+            event->accept();
+            return;
+        }
+
+        toggleDetailMode();
+        event->accept();
+    }
+
+private:
+    [[nodiscard]] QRect backButtonRect() const
+    {
+        return {width() - 54, 8, 44, 22};
+    }
+
+    [[nodiscard]] QRectF summaryBottomRect() const
+    {
+        const QRectF content = rect().adjusted(8, 8, -8, -8);
+        constexpr qreal bottomHeight = 58.0;
+        return {content.left(), content.bottom() - bottomHeight + 1.0, content.width(), bottomHeight};
+    }
+
+    [[nodiscard]] QRectF summaryImageRect() const
+    {
+        const QRectF content = rect().adjusted(8, 8, -8, -8);
+        const QRectF bottomRect = summaryBottomRect();
+        return {content.left(), content.top(), content.width(), bottomRect.top() - content.top() + 8.0};
+    }
+
+    void enterDetailMode()
+    {
+        m_pressed = false;
+        m_detailMode = true;
+        refreshToolTip();
+        update();
+    }
+
+    void exitDetailMode()
+    {
+        m_pressed = false;
+        m_detailMode = false;
+        refreshToolTip();
+        update();
+    }
+
+    void toggleDetailMode()
+    {
+        if (m_detailMode) {
+            exitDetailMode();
+        } else {
+            enterDetailMode();
+        }
+    }
+
+    void refreshToolTip()
+    {
+        if (!m_hasSlot) {
+            setToolTip("该商店槽位已售出，刷新商店可获得新英雄");
+            return;
+        }
+
+        if (m_detailMode) {
+            setToolTip("左键点击返回按钮关闭详情；右键或触控板双指点按也可关闭");
+            return;
+        }
+
+        setToolTip(m_canBuy
+            ? "左键单击整张卡牌立即购买；右键或触控板双指点按查看详情"
+            : "金币不足或备战席已满；右键或触控板双指点按仍可查看详情");
+    }
+
+    void paintFrame(QPainter* painter, const QColor& borderColor)
+    {
+        const QRectF cardRect = rect().adjusted(2, 2, -2, -2);
+        painter->setPen(QPen(borderColor, m_alreadyOwned ? 2.5 : 1.6));
+        painter->setBrush(QColor(35, 38, 48));
+        painter->drawRoundedRect(cardRect, 8, 8);
+    }
+
+    void paintEmpty(QPainter* painter)
+    {
+        paintFrame(painter, QColor(76, 82, 97));
+        painter->setPen(QColor(150, 156, 172));
+        QFont font = painter->font();
+        font.setPointSize(13);
+        font.setBold(true);
+        painter->setFont(font);
+        painter->drawText(rect(), Qt::AlignCenter | Qt::TextWordWrap,
+                          "Sold\nRefresh the shop to roll a new hero.");
+    }
+
+    void paintSummary(QPainter* painter)
+    {
+        const QColor borderColor = m_alreadyOwned ? QColor(88, 209, 122) : QColor(210, 170, 64);
+        paintFrame(painter, borderColor);
+
+        const QRectF imageRect = summaryImageRect();
+        const QRectF bottomRect = summaryBottomRect();
+
+        QPainterPath clip;
+        clip.addRoundedRect(imageRect, 6, 6);
+        painter->save();
+        painter->setClipPath(clip);
+        if (!m_portrait.isNull()) {
+            const QSize targetSize = imageRect.size().toSize();
+            const QPixmap scaled = m_portrait.scaled(targetSize, Qt::KeepAspectRatioByExpanding,
+                                                     Qt::SmoothTransformation);
+            const QPointF topLeft(imageRect.center().x() - scaled.width() * 0.5,
+                                  imageRect.center().y() - scaled.height() * 0.5);
+            painter->drawPixmap(topLeft, scaled);
+        } else {
+            QLinearGradient gradient(imageRect.topLeft(), imageRect.bottomRight());
+            gradient.setColorAt(0.0, QColor(62, 68, 92));
+            gradient.setColorAt(1.0, QColor(28, 31, 42));
+            painter->fillRect(imageRect, gradient);
+        }
+        painter->restore();
+
+        QLinearGradient imageShade(imageRect.bottomLeft(), imageRect.topLeft());
+        imageShade.setColorAt(0.0, QColor(0, 0, 0, 180));
+        imageShade.setColorAt(0.55, QColor(0, 0, 0, 20));
+        painter->fillRect(imageRect, imageShade);
+
+        const QStringList traitLines = compactTraitLines(m_slot);
+        constexpr qreal traitHeight = 20.0;
+        constexpr qreal traitGap = 4.0;
+        qreal traitY = imageRect.bottom() - 18.0
+            - traitLines.size() * traitHeight
+            - qMax(0, traitLines.size() - 1) * traitGap;
+        for (const QString& trait : traitLines) {
+            QFont traitFont = painter->font();
+            traitFont.setPointSize(8);
+            traitFont.setBold(true);
+            painter->setFont(traitFont);
+            const qreal traitWidth = qMin<qreal>(imageRect.width() - 20.0,
+                                                 painter->fontMetrics().horizontalAdvance(trait) + 18.0);
+            const QRectF traitRect(imageRect.left() + 9.0, traitY, traitWidth, traitHeight);
+            painter->setPen(QPen(QColor(218, 190, 91), 1.2));
+            painter->setBrush(QColor(24, 27, 35, 220));
+            painter->drawRoundedRect(traitRect, 5, 5);
+            painter->setPen(QColor(245, 232, 176));
+            painter->drawText(traitRect.adjusted(7, 0, -7, 0), Qt::AlignVCenter | Qt::AlignLeft, trait);
+            traitY += traitHeight + traitGap;
+        }
+
+        painter->setPen(Qt::NoPen);
+        painter->setBrush(QColor(169, 116, 18, 220));
+        painter->drawRoundedRect(bottomRect, 5, 5);
+        QLinearGradient bottomGlow(bottomRect.topLeft(), bottomRect.bottomLeft());
+        bottomGlow.setColorAt(0.0, QColor(239, 190, 55, 105));
+        bottomGlow.setColorAt(1.0, QColor(119, 72, 7, 125));
+        painter->fillRect(bottomRect.adjusted(1, 1, -1, -1), bottomGlow);
+
+        painter->setPen(Qt::white);
+        QFont nameFont = painter->font();
+        nameFont.setPointSize(12);
+        nameFont.setBold(true);
+        painter->setFont(nameFont);
+        QFontMetrics nameMetrics(nameFont);
+        const QString heroName = nameMetrics.elidedText(m_slot.heroName, Qt::ElideRight,
+                                                        qRound(bottomRect.width() - 74.0));
+        painter->drawText(bottomRect.adjusted(10, 5, -66, -30), Qt::AlignLeft | Qt::AlignVCenter,
+                          heroName);
+
+        QFont localizedFont = painter->font();
+        localizedFont.setPointSize(9);
+        localizedFont.setBold(false);
+        painter->setFont(localizedFont);
+        QFontMetrics localizedMetrics(localizedFont);
+        const QString localizedName = localizedMetrics.elidedText(heroLocalizedName(m_slot.heroType),
+                                                                  Qt::ElideRight,
+                                                                  qRound(bottomRect.width() - 74.0));
+        painter->drawText(bottomRect.adjusted(10, 28, -66, -6), Qt::AlignLeft | Qt::AlignVCenter,
+                          localizedName);
+
+        painter->setPen(QColor(255, 245, 197));
+        QFont costFont = painter->font();
+        costFont.setPointSize(11);
+        costFont.setBold(true);
+        painter->setFont(costFont);
+        painter->drawText(bottomRect.adjusted(0, 5, -10, -5), Qt::AlignVCenter | Qt::AlignRight,
+                          QString("cost %1").arg(m_slot.cost));
+
+        if (!m_canBuy) {
+            painter->fillRect(rect(), QColor(0, 0, 0, 85));
+            painter->setPen(QColor(240, 205, 140));
+            QFont lockFont = painter->font();
+            lockFont.setPointSize(12);
+            lockFont.setBold(true);
+            painter->setFont(lockFont);
+            painter->drawText(imageRect.adjusted(12, 12, -12, -12),
+                              Qt::AlignTop | Qt::AlignRight,
+                              "不可购买");
+        }
+    }
+
+    void paintDetails(QPainter* painter)
+    {
+        paintFrame(painter, QColor(128, 145, 188));
+
+        const QRectF content = rect().adjusted(10, 8, -10, -8);
+        const QRect back = backButtonRect();
+        painter->setPen(QPen(QColor(202, 210, 234), 1.2));
+        painter->setBrush(QColor(48, 53, 68));
+        painter->drawRoundedRect(back, 5, 5);
+        painter->setPen(QColor(240, 242, 248));
+        QFont backFont = painter->font();
+        backFont.setPointSize(8);
+        backFont.setBold(true);
+        painter->setFont(backFont);
+        painter->drawText(back, Qt::AlignCenter, "返回");
+
+        painter->setPen(QColor(244, 211, 122));
+        QFont titleFont = painter->font();
+        titleFont.setPointSize(10);
+        titleFont.setBold(true);
+        painter->setFont(titleFont);
+        painter->drawText(QRectF(content.left(), content.top(), content.width() - 54, 22),
+                          Qt::AlignLeft | Qt::AlignVCenter,
+                          QString("%1 %2").arg(m_slot.heroName, heroLocalizedName(m_slot.heroType)));
+
+        const QString details = QString("费用 %1  星级 %2\n"
+                                        "站位 %3\n"
+                                        "HP %4  ATK %5\n"
+                                        "Range %6  Mana %7/%8\n"
+                                        "Armor %9  MR %10\n"
+                                        "AS %11  Crit %12%\n"
+                                        "Origin: %13\n"
+                                        "Role: %14\n\n%15")
+            .arg(m_slot.cost)
+            .arg(m_slot.star)
+            .arg(positionTypeText(m_slot.positionType))
+            .arg(m_slot.maxHp)
+            .arg(m_slot.atk)
+            .arg(m_slot.range)
+            .arg(m_slot.mana)
+            .arg(m_slot.maxMana)
+            .arg(m_slot.armor)
+            .arg(m_slot.magicResist)
+            .arg(m_slot.attackSpeed, 0, 'f', 2)
+            .arg(m_slot.critRate * 100.0, 0, 'f', 0)
+            .arg(originsText(m_slot))
+            .arg(rolesText(m_slot))
+            .arg(m_slot.skillDescription);
+
+        painter->setPen(QColor(230, 232, 240));
+        QFont bodyFont = painter->font();
+        bodyFont.setPointSize(8);
+        bodyFont.setBold(false);
+        painter->setFont(bodyFont);
+        painter->drawText(content.adjusted(0, 32, 0, 0),
+                          Qt::AlignTop | Qt::AlignLeft | Qt::TextWordWrap,
+                          details);
+    }
+
+    ShopSlot m_slot{};
+    bool m_hasSlot = false;
+    bool m_canBuy = false;
+    bool m_alreadyOwned = false;
+    bool m_detailMode = false;
+    bool m_pressed = false;
+    bool m_ignoreNextContextMenu = false;
+    QPixmap m_portrait;
+};
 }
 
 GameWindow::GameWindow(QWidget* parent)
@@ -444,20 +1017,15 @@ GameWindow::GameWindow(QWidget* parent)
     , m_centralWidget(new QWidget(this))
     , m_mainLayout(new QVBoxLayout())
     , m_contentLayout(new QHBoxLayout())
-    , m_view(new QGraphicsView(this))
-    , m_equipmentAtlasButton(new QPushButton("装备图谱", m_view->viewport()))
+    , m_view(new ZoomableGraphicsView(this))
     , m_shopScrollArea(new QScrollArea(this))
     , m_shopPanel(new QWidget())
     , m_topRoundLabel(new QLabel(this))
+    , m_shopToggleButton(new QPushButton("Shop ▼", this))
     , m_enemyStatusLabel(new QLabel(this))
     , m_synergyStatusLabel(new QLabel(this))
     , m_shopTitleLabel(new QLabel("Shop", this))
-    , m_shopCards{new QPushButton(this), new QPushButton(this), new QPushButton(this), new QPushButton(this), new QPushButton(this)}
-    , m_shopNameLabels{new QLabel(this), new QLabel(this), new QLabel(this), new QLabel(this), new QLabel(this)}
-    , m_shopMetaLabels{new QLabel(this), new QLabel(this), new QLabel(this), new QLabel(this), new QLabel(this)}
-    , m_shopStatsLabels{new QLabel(this), new QLabel(this), new QLabel(this), new QLabel(this), new QLabel(this)}
-    , m_shopTraitsLabels{new QLabel(this), new QLabel(this), new QLabel(this), new QLabel(this), new QLabel(this)}
-    , m_shopSkillLabels{new QLabel(this), new QLabel(this), new QLabel(this), new QLabel(this), new QLabel(this)}
+    , m_shopCards{new ShopCardButton(this), new ShopCardButton(this), new ShopCardButton(this), new ShopCardButton(this), new ShopCardButton(this)}
     , m_refreshShopButton(new QPushButton("Refresh 4 gold", this))
     , m_resetButton(new QPushButton("Reset", this))
     , m_saveButton(new QPushButton("存档", this))
@@ -467,6 +1035,7 @@ GameWindow::GameWindow(QWidget* parent)
     , m_goldStatusLabel(new QLabel(this))
     , m_levelStatusButton(new QPushButton(this))
     , m_roundStatusLabel(new QLabel(this))
+    , m_phaseStatusLabel(new QLabel(this))
     , m_game(std::make_unique<Game>())
 {
     setupUI();
@@ -474,6 +1043,9 @@ GameWindow::GameWindow(QWidget* parent)
     refreshStatusBar();
     refreshShopPanel();
     fitSceneInView();
+    QTimer::singleShot(0, this, [this]() {
+        fitSceneInView();
+    });
 }
 
 GameWindow::~GameWindow()
@@ -497,8 +1069,6 @@ void GameWindow::resizeEvent(QResizeEvent* event)
 {
     QMainWindow::resizeEvent(event);
     fitSceneInView();
-    m_equipmentAtlasButton->move(12, 12);
-    m_equipmentAtlasButton->raise();
 }
 
 void GameWindow::setupUI()
@@ -532,35 +1102,13 @@ void GameWindow::setupUI()
 
     m_view->setRenderHint(QPainter::Antialiasing, true);
     m_view->setDragMode(QGraphicsView::NoDrag);
-    m_view->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-    m_view->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    m_view->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    m_view->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_view->setAlignment(Qt::AlignCenter);
     m_view->setTransformationAnchor(QGraphicsView::AnchorViewCenter);
     m_view->setResizeAnchor(QGraphicsView::AnchorViewCenter);
     m_view->setMouseTracking(true);
     m_view->viewport()->setMouseTracking(true);
-    // 图谱入口挂在视图表层，窗口缩放和棋盘适配不会改变它在左上角的位置。
-    m_equipmentAtlasButton->setFixedSize(104, 38);
-    m_equipmentAtlasButton->setToolTip("装备合成图谱");
-    m_equipmentAtlasButton->setStyleSheet(R"(
-        QPushButton {
-            background-color: #262936;
-            color: #f0d37a;
-            border: 1px solid #9b824b;
-            border-radius: 5px;
-            font-size: 14px;
-            font-weight: 700;
-        }
-        QPushButton:hover {
-            background-color: #363a49;
-            border-color: #d1ad55;
-        }
-        QPushButton:pressed {
-            background-color: #1d202a;
-        }
-    )");
-    m_equipmentAtlasButton->move(12, 12);
-    m_equipmentAtlasButton->raise();
 
     const QString headerLabelStyle = R"(
         QLabel {
@@ -592,7 +1140,6 @@ void GameWindow::setupUI()
     topBarLayout->addStretch();
     topBarLayout->addWidget(m_topRoundLabel);
     topBarLayout->addStretch();
-    topBarLayout->addSpacing(160);
     releaseToQt(topLayout);
     m_mainLayout->addWidget(topBar.release());
 
@@ -600,86 +1147,54 @@ void GameWindow::setupUI()
     m_contentLayout->setSpacing(12);
     m_contentLayout->addWidget(m_view, 1);
 
-    auto shopLayout = std::make_unique<QVBoxLayout>(m_shopPanel);
+    auto shopLayout = std::make_unique<QHBoxLayout>(m_shopPanel);
     auto* shopPanelLayout = shopLayout.get();
-    shopLayout->setContentsMargins(10, 10, 10, 10);
-    shopLayout->setSpacing(10);
-    m_shopPanel->setFixedWidth(380);
+    shopLayout->setContentsMargins(12, 10, 12, 10);
+    shopLayout->setSpacing(12);
     m_shopPanel->setObjectName("ShopPanel");
     m_shopPanel->setStyleSheet(R"(
         QWidget#ShopPanel {
             background-color: #202126;
             border: 1px solid #3f4350;
         }
-        QPushButton#ShopCard {
-            background-color: #303442;
-            border: 1px solid #7c8499;
-            border-radius: 4px;
-            text-align: left;
-        }
-        QPushButton#ShopCard:hover {
-            background-color: #383d4d;
-            border-color: #a7b0ca;
-        }
-        QPushButton#ShopCard:pressed {
-            background-color: #262a36;
-        }
-        QPushButton#ShopCard:disabled {
-            background-color: #252833;
-            border-color: #555b6d;
-        }
         QLabel {
             border: none;
             color: #f2f2f2;
         }
     )");
-    shopPanelLayout->addWidget(m_shopTitleLabel);
+    auto shopHeader = std::make_unique<QWidget>();
+    auto shopHeaderLayout = std::make_unique<QVBoxLayout>(shopHeader.get());
+    auto* shopHeaderItems = shopHeaderLayout.get();
+    shopHeaderLayout->setContentsMargins(0, 0, 0, 0);
+    shopHeaderLayout->setSpacing(10);
+    m_shopTitleLabel->setAlignment(Qt::AlignCenter);
+    m_shopTitleLabel->setStyleSheet("font-size: 18px; font-weight: 800; color: #f0d37a;");
+    shopHeaderItems->addWidget(m_shopTitleLabel);
+    m_refreshShopButton->setMinimumHeight(42);
+    shopHeaderItems->addWidget(m_refreshShopButton);
+    shopHeaderItems->addStretch();
+    releaseToQt(shopHeaderLayout);
+    shopPanelLayout->addWidget(shopHeader.release());
 
     for (int i = 0; i < static_cast<int>(m_shopCards.size()); ++i) {
         QPushButton* card = m_shopCards[i];
         card->setObjectName("ShopCard");
-        card->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-        // 整张商店卡牌本身就是按钮，点击卡牌任意位置都会尝试购买该英雄。
+        card->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
         card->setFlat(true);
-
-        auto cardLayout = std::make_unique<QVBoxLayout>(card);
-        auto* shopCardLayout = cardLayout.get();
-        cardLayout->setContentsMargins(16, 14, 16, 14);
-        cardLayout->setSpacing(7);
-
-        m_shopNameLabels[i]->setStyleSheet("font-size: 18px; font-weight: 800;");
-        m_shopMetaLabels[i]->setStyleSheet("font-size: 13px; color: #f0d37a; font-weight: 700;");
-        m_shopStatsLabels[i]->setTextFormat(Qt::RichText);
-        m_shopStatsLabels[i]->setStyleSheet("font-size: 13px; font-family: Menlo, Monaco, monospace;");
-        m_shopTraitsLabels[i]->setWordWrap(true);
-        m_shopTraitsLabels[i]->setStyleSheet("font-size: 12px; color: #d6d9e5;");
-        m_shopSkillLabels[i]->setWordWrap(true);
-        m_shopSkillLabels[i]->setTextFormat(Qt::RichText);
-        m_shopSkillLabels[i]->setAlignment(Qt::AlignTop);
-        m_shopSkillLabels[i]->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-        m_shopSkillLabels[i]->setStyleSheet("font-size: 13px; color: #e8eaf2;");
-
-        shopCardLayout->addWidget(m_shopNameLabels[i]);
-        shopCardLayout->addWidget(m_shopMetaLabels[i]);
-        shopCardLayout->addWidget(m_shopStatsLabels[i]);
-        shopCardLayout->addWidget(m_shopTraitsLabels[i]);
-        shopCardLayout->addSpacing(4);
-        shopCardLayout->addWidget(m_shopSkillLabels[i], 1);
-        releaseToQt(cardLayout);
-        shopPanelLayout->addWidget(card, 1);
+        shopPanelLayout->addWidget(card);
     }
 
-    shopPanelLayout->addWidget(m_refreshShopButton);
+    shopPanelLayout->addStretch(1);
     releaseToQt(shopLayout);
     m_shopScrollArea->setWidget(m_shopPanel);
     m_shopScrollArea->setWidgetResizable(true);
     m_shopScrollArea->setFrameShape(QFrame::NoFrame);
-    m_shopScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    m_shopScrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-    m_shopScrollArea->setFixedWidth(396);
+    m_shopScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    m_shopScrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    m_shopScrollArea->setFixedHeight(kShopPanelExpandedHeight);
     m_shopScrollArea->setStyleSheet("QScrollArea { border: none; background: transparent; }");
-    m_contentLayout->addWidget(m_shopScrollArea);
     m_mainLayout->addLayout(m_contentLayout, 1);
+    m_mainLayout->addWidget(m_shopScrollArea);
 
     auto controlBar = std::make_unique<QWidget>();
     auto controlLayout = std::make_unique<QHBoxLayout>(controlBar.get());
@@ -736,10 +1251,16 @@ void GameWindow::setupUI()
     m_levelStatusButton->setFixedWidth(112);
     m_levelStatusButton->setStyleSheet(statusButtonStyle(false));
     controls->addWidget(m_levelStatusButton);
-    m_roundStatusLabel->setStyleSheet(statusStyle);
-    m_roundStatusLabel->setAlignment(Qt::AlignCenter);
-    m_roundStatusLabel->setFixedWidth(112);
-    controls->addWidget(m_roundStatusLabel);
+    for (QLabel* label : {m_roundStatusLabel, m_phaseStatusLabel}) {
+        label->setStyleSheet(statusStyle);
+        label->setAlignment(Qt::AlignCenter);
+        label->setFixedWidth(112);
+        controls->addWidget(label);
+    }
+    m_shopToggleButton->setFixedWidth(96);
+    m_shopToggleButton->setStyleSheet(statusButtonStyle(true));
+    m_shopToggleButton->setToolTip("收起商店栏");
+    controls->addWidget(m_shopToggleButton);
 
     controls->addStretch();
     releaseToQt(controlLayout);
@@ -805,6 +1326,10 @@ void GameWindow::setupUI()
                     m_game->buyLevelProgress();
                 }
             });
+    connect(m_shopToggleButton, &QPushButton::clicked,
+            this, [this]() {
+                setShopPanelExpanded(!m_shopPanelExpanded);
+            });
     for (int i = 0; i < static_cast<int>(m_shopCards.size()); ++i) {
         connect(m_shopCards[i], &QPushButton::clicked,
                 this, [this, i]() {
@@ -819,7 +1344,7 @@ void GameWindow::setupUI()
                     m_game->refreshShop();
                 }
             });
-    connect(m_equipmentAtlasButton, &QPushButton::clicked,
+    connect(m_game.get(), &Game::equipmentAtlasRequested,
             this, &GameWindow::showEquipmentAtlas);
 
     m_view->setScene(m_game->scene());
@@ -836,10 +1361,12 @@ void GameWindow::fitSceneInView() const
         return;
     }
 
-    constexpr qreal kMinReadableScale = 0.75;
-    constexpr qreal kMaxAutoScale = 1.0;
+    constexpr qreal kMaxAutoScale = 1.80;
 
-    const QRectF paddedBounds = bounds.adjusted(-16, -16, 16, 16);
+    m_view->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    m_view->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+
+    const QRectF paddedBounds = bounds.adjusted(-14, -14, 14, 14);
     const QSize viewportSize = m_view->viewport()->size();
     if (viewportSize.isEmpty() || paddedBounds.width() <= 0.0 || paddedBounds.height() <= 0.0) {
         return;
@@ -847,12 +1374,63 @@ void GameWindow::fitSceneInView() const
 
     const qreal scaleX = static_cast<qreal>(viewportSize.width()) / paddedBounds.width();
     const qreal scaleY = static_cast<qreal>(viewportSize.height()) / paddedBounds.height();
-    qreal scaleFactor = qMin(scaleX, scaleY);
-    scaleFactor = qBound(kMinReadableScale, scaleFactor, kMaxAutoScale);
+    // Startup fit must show the whole scene. Do not force a minimum scale here;
+    // otherwise compact windows crop the top/bottom and immediately show scroll bars.
+    const qreal scaleFactor = qMin(qMin(scaleX, scaleY), kMaxAutoScale);
 
     m_view->resetTransform();
     m_view->scale(scaleFactor, scaleFactor);
     m_view->centerOn(bounds.center());
+}
+
+void GameWindow::setShopPanelExpanded(bool expanded)
+{
+    if (m_shopScrollArea == nullptr || m_shopToggleButton == nullptr) {
+        return;
+    }
+
+    m_shopPanelExpanded = expanded;
+    m_shopToggleButton->setText(expanded ? "Shop ▼" : "Shop ▲");
+    m_shopToggleButton->setToolTip(expanded ? "收起商店栏" : "从底部打开商店栏");
+
+    const int targetHeight = expanded ? kShopPanelExpandedHeight : 0;
+    const int startHeight = m_shopScrollArea->height();
+    if (m_shopPanelAnimation != nullptr) {
+        m_shopPanelAnimation->stop();
+        m_shopPanelAnimation->deleteLater();
+        m_shopPanelAnimation = nullptr;
+    }
+
+    if (startHeight == targetHeight) {
+        m_shopScrollArea->setFixedHeight(targetHeight);
+        fitSceneInView();
+        return;
+    }
+
+    auto* animation = new QVariantAnimation(this);
+    m_shopPanelAnimation = animation;
+    animation->setDuration(kShopPanelAnimationMs);
+    animation->setStartValue(startHeight);
+    animation->setEndValue(targetHeight);
+    animation->setEasingCurve(expanded ? QEasingCurve::OutCubic : QEasingCurve::InCubic);
+    connect(animation, &QVariantAnimation::valueChanged,
+            this, [this](const QVariant& value) {
+                if (m_shopScrollArea != nullptr) {
+                    m_shopScrollArea->setFixedHeight(value.toInt());
+                }
+            });
+    connect(animation, &QVariantAnimation::finished,
+            this, [this, animation, targetHeight]() {
+                if (m_shopScrollArea != nullptr) {
+                    m_shopScrollArea->setFixedHeight(targetHeight);
+                }
+                if (m_shopPanelAnimation == animation) {
+                    m_shopPanelAnimation = nullptr;
+                }
+                animation->deleteLater();
+                fitSceneInView();
+            });
+    animation->start();
 }
 
 void GameWindow::refreshStatusBar() const
@@ -888,6 +1466,18 @@ void GameWindow::refreshStatusBar() const
         !m_game->isGameOver() && player.gold() >= 4 && player.levelProgressNeeded() > 0));
     m_levelStatusButton->setEnabled(!m_game->isGameOver() && player.levelProgressNeeded() > 0);
     m_roundStatusLabel->setText(QString("Round %1").arg(player.round()));
+    if (m_game->isGameOver()) {
+        m_phaseStatusLabel->setText("Game Over");
+    } else if (m_game->phase() == GamePhase::Combat) {
+        m_phaseStatusLabel->setText("Combat");
+    } else {
+        const int remainingSeconds = m_game->preparationRemainingSeconds();
+        const int minutes = remainingSeconds / 60;
+        const int seconds = remainingSeconds % 60;
+        m_phaseStatusLabel->setText(QString("Prep %1:%2")
+            .arg(minutes)
+            .arg(seconds, 2, 10, QChar('0')));
+    }
     if (m_game->isGameOver()) {
         m_combatButton->setText("Game Over");
         m_combatButton->setEnabled(false);
@@ -1224,32 +1814,16 @@ void GameWindow::refreshShopPanel() const
     const Player& player = m_game->player();
     const bool benchIsFull = m_game->benchFull();
     for (int i = 0; i < static_cast<int>(m_shopCards.size()); ++i) {
-        QPushButton* card = m_shopCards[i];
+        auto* card = static_cast<ShopCardButton*>(m_shopCards[i]);
         if (i < static_cast<int>(shopSlots.size())) {
             const ShopSlot& slot = shopSlots[i];
             const bool canBuy = !m_game->isGameOver() && !benchIsFull && player.gold() >= slot.cost;
             const bool alreadyOwned = m_game->playerOwnsHero(slot.heroName);
             card->setVisible(true);
-            card->setEnabled(canBuy);
-            card->setStyleSheet(shopCardStyle(alreadyOwned));
-            m_shopNameLabels[i]->setText(QString("%1  %2")
-                .arg(slot.heroName, heroLocalizedName(slot.heroType)));
-            m_shopMetaLabels[i]->setText(QString("Cost: %1 gold     Star: %2")
-                .arg(slot.cost)
-                .arg(slot.star));
-            m_shopStatsLabels[i]->setText(shopStatsText(slot));
-            m_shopTraitsLabels[i]->setText(QString("Origin: %1\nRole: %2")
-                .arg(originsText(slot), rolesText(slot)));
-            m_shopSkillLabels[i]->setText(skillText(slot));
+            card->setShopSlot(&slot, canBuy, alreadyOwned);
         } else {
             card->setVisible(true);
-            card->setEnabled(false);
-            card->setStyleSheet(shopCardStyle(false));
-            m_shopNameLabels[i]->setText("Sold");
-            m_shopMetaLabels[i]->clear();
-            m_shopStatsLabels[i]->clear();
-            m_shopTraitsLabels[i]->clear();
-            m_shopSkillLabels[i]->setText("Refresh the shop to roll a new hero.");
+            card->setShopSlot(nullptr, false, false);
         }
     }
     m_refreshShopButton->setEnabled(!m_game->isGameOver() && player.gold() >= 4);

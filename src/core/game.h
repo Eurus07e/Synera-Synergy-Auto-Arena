@@ -141,6 +141,7 @@ public:
     [[nodiscard]] bool isGameOver() const { return m_gameOver; }
     [[nodiscard]] QStringList activePlayerSynergyTexts();
     [[nodiscard]] QString combatStatusText(const Unit* unit) const;
+    [[nodiscard]] int preparationRemainingSeconds() const { return m_preparationRemainingSeconds; }
     [[nodiscard]] bool canStartCombat() const;
     bool startCombat();
     bool endCombat();
@@ -163,6 +164,7 @@ signals:
     void stateChanged();
     void unitCardRequested(Unit* unit);
     void gameFinished(bool playerWon);
+    void equipmentAtlasRequested();
 
 private:
     [[nodiscard]] Unit* findUnitById(int unitId) const;
@@ -232,6 +234,7 @@ private:
     bool refreshEnemyShop();
     bool deployEnemyUnitFromBench(Unit* unit);
     void arrangeEnemyFormation();
+    void optimizeEnemyLineup();
     [[nodiscard]] bool enemyBenchFull() const;
     [[nodiscard]] int enemyUnitScore(const Unit* unit) const;
     [[nodiscard]] int enemyShopSlotScore(const ShopSlot& slot) const;
@@ -242,6 +245,10 @@ private:
     [[nodiscard]] QPoint fallbackEnemyDeployPosition() const;
     void updateAttackProjectiles();
     void clearAttackProjectiles();
+    void startPreparationTimer();
+    void stopPreparationTimer();
+    void resetPreparationTimer();
+    bool beginCombat(bool forced);
 
 
     Board m_board;
@@ -254,6 +261,7 @@ private:
     QGraphicsScene* m_scene;
     QTimer* m_combatTimer;
     QTimer* m_projectileTimer;
+    QTimer* m_preparationTimer;
     std::vector<GridItem*> m_gridItems;
     std::vector<QGraphicsRectItem*> m_benchSlotItems;
     std::vector<QGraphicsRectItem*> m_enemyBenchSlotItems;
@@ -292,6 +300,7 @@ private:
     int m_enemyInterestGoldSnapshot;
     bool m_enemyPreparationDone;
     bool m_gameOver;
+    int m_preparationRemainingSeconds;
 
     GamePhase m_phase;
 

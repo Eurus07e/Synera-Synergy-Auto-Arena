@@ -26,6 +26,7 @@ XinZhao::XinZhao()
     m_state = UnitState::Idle;
 }
 
+// 技能：三重爪击。对目标造成三段伤害，治疗自身，并眩晕目标1.5秒。
 void XinZhao::castSkill(Game* game, Unit* target)
 {
     CombatUnitState& casterState = game->combatState(this);

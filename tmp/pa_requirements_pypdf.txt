@@ -1,0 +1,422 @@
+
+
+===== PAGE 1 =====
+Synera: Synergy Auto-Arena
+ज़ӱ P A֝
+2026 ୍ 5 ᄅ 8 ರ
+ᅋေ
+Ҧ੻Ⴓ༤௖োđ սіቔႵ uThe Last FlameuTeamfight
+Tacticsлᅱଟႇྦ
+ڵ
+лb
+ЧՑ P A ଀ູ Synera: Synergy Auto-Arenađ ь൞ႨC++ ϱ
+ሱሼఄႳ༤ (PVE)bLet’s Go!
+0 ष൓ᆭభ
+W ARNING
+All of the code for this project must be your own. You may not copy source code
+from other students or other sources that you find on the web. Plagiarism will not
+be tolerated.
+1. ީ
+Чज़
+b
+2. ֥
+ཛ
+ߐ
+b
+3. ЧՑ P Aࡼ࠹
+ֻ 6 ֻބ 8 ൌགྷඨ྽҂఼ᇅေ
+Ұb
+1
+
+===== PAGE 2 =====
+࠹Synera: Synergy Auto-Arena 2026 Խ
+ඪૼ
+Ď ğ
+•ॶູ B = [1 , M] × [1, N]ູ (x, y)ݦ
+ඔ occr(x, y) ∈ U r ∪ {∅}ֻrֆ໊b
+• Сᅞ౵ູ K = {1, . . . , K}čೂ K = 8ಸ
+ֆ໊b
+•აֆູ໊ pႏ/ູ u ∈ U b
+đनႮ Unit іൕb
+•උა᪉ϸѓదၬowner(u) ∈ {PlayerCtrl, EnemyCtrl}ٚ/ֱ
+ၬtraits(u) ⊆ T іൕᆯြ/ֱ
+Ď b
+•؍ࢨֻrູ Ur = Ar ∪ Erđఃᇏ ArđEr
+ູ Prep→Combat→Resolveb
+•ࠏކࠢS = {Idle, Moving, Attacking, Casting, Dead}b
+•ࠌ۾ֆ໊ uၬູ
+Oppr(u) = {v ∈ U r | owner(v) ̸= owner(u), vࠃ}.
+ᄵ (ೂളଁᆴaቕѓ྽) ԩ৘b
+•აದ१ູ gઙ/඗ྍ/ႋሑ෿ሇ၍ g ← g − cbഈ
+ᆔჿඏູ |Ar| ≤ cap(p)b
+• ᪉ϸѓద t ∈ Tඔ
+nt = |{u ∈ A r | t ∈ traits(u)}|,
+֒ntކࠢΘtb
+• ശྒაልСѩෘሰ merge3(·)ĠልСҢ
+ඔ eq(u) ડቀಸਈჿඏčೂ 1Ď b
+•ູ֖ (ڿ)
+Σ = ( p, r, phase, Ar, Er, Bench, Shop, EquipPool).
+گ֖߫ࠧ؀Σb
+2
+
+===== PAGE 3 =====
+࠹Synera: Synergy Auto-Arena 2026 Խ
+1 భ࿽
+ሱሼఄčAuto-battlerႳ༤௖োđսіቔႵu The Last
+FlameuTeamfight Tactics଀ູ
+Synera: Synergy Auto-ArenaሱሼఄႳ༤b
+ᄝ Syneraुֆ໊აAIದ
+čPVEčOOPֆ
+ᄝ 3000 ྛၛഈb
+Ӯაဒ൬ඪૼ
+ྛਆՑğ
+•ିb
+•ିb
+ཛ ᅝб
+ି 70%ିൌགྷĎ
+ঔᅚଽಸ 10%Ď
+۬ڄ10%čOOPĎ
+ٓܿࢌ10%ݣREADME / AI ൐ႨඪૼĎ
+2၂
+2.1 ఄ஍აСᅞ౵
+۱M × Nč২ೂ 8 × 8϶ӆč༯
+۱1 × 1ᆺିಸ
+ֆ໊b
+֥Сᅞ౵čBenchđ২ೂ 8ܓ
+ֆ໊b
+2.2޺ࢌ
+ֆ໊Ԥඋྟğളଁᆴ (HP)৯ (ATK)a
+ए৖ (Range)৯ᆴ (Max Mana)৯ᆴ (Mana)b
+ো UnitॖၛႵ
+උྟđೂልСabuffಖ୆္ॖၛ
+3
+
+===== PAGE 4 =====
+࠹Synera: Synergy Auto-Arena 2026 Խ
+ᄝ UnitĎ b
+འଆ྘ඪૼ
+ೂ༯ğ
+•čPlayerĎູpሑ෿ č࿓
+ࣜ
+ႏა҃ᆔथҦb
+• ֆ໊čUnitĎູ u ∈ Uܒࢲ
+čೂ HPaATKaRangeaMax Mana aManaĎ b
+•උඔ
+owner : U → { PlayerCtrl, EnemyCtrl}.
+ֆ໊/іൕowner(u) ౼ᆴ҂๝đЧᇉഈ൞๝၂ো Unitđ ҂
+Ӯਆส҂๝ো྘ุ༢b
+• ᪉ϸѓదၬ traits(u) ⊆ T đႨႿᆯြ/đ҂Ⴈ
+b
+•ކֻࠢrၬູ
+Ur = Ar ∪ Er, Ar ∩ Er = ∅,
+ఃᇏ ArđErb
+•༢ֆ໊ uၬູ
+Oppr(u) = {v ∈ U r | owner(v) ̸= owner(u), vࠃ}.
+ࡅඋྟbທ
+ਬᄵႳ༤ാϧb
+ֆ໊༢๤ֆ໊नູ Unitݖowner ሳ
+උĠtraitsֻrव஥ᇂള
+ކֱࠢٚErູ Arb೏ Er ಆ૵ᄵЧ੽഻০đ೏
+Arೆ༯၂੽b
+ࡗሱႮ຀ሄᆜᅟ
+֐ࠇ
+ჰ໊Ď b
+4
+
+===== PAGE 5 =====
+࠹Synera: Synergy Auto-Arena 2026 Խ
+2.3 GUI
+૫čGUI֥GUIఄ஍aСᅞ౵
+Ԥඋ
+ྟ૫ϰb
+b
+၂ Checklist
+• [ ] ൌགྷ M × N϶ӆ/ᄵb
+• [ ] ൌགྷСᅞ౵čBenchඔऌ๝҄b
+• [ ] ൌགྷ UnitোčHP/ATK/Range/Max Mana/ManaĎ b
+• [ ]ٚ/ҐႨ๤၂ UnitႨ ownerඋđtraits
+ႨႿ᪉ϸb
+• [ ]੽ՑളӮčErĎ b
+• [ ]Ď b
+• [ ] GUI ᅚൕఄ஍/Сᅞ౵/උྟ૫ϰĎ b
+3ؽ؍ࢨ
+3.1ࠏ
+ࠏPvE֒
+ದᆔಸb
+ູ؍ࢨčஆѡ҃ᆔĎ đ؍ࢨ׶đႮ AIĎა؍ࢨđ
+ቔູ၂Ց Loopඏb
+•ದ१
+b
+•ࠏ
+čೂ Idle, Moving, Attacking, Casting, Deadb
+•лඔĠ೏Վ੽
+лඔb
+5
+
+===== PAGE 6 =====
+࠹Synera: Synergy Auto-Arena 2026 Խ
+•ࡱवčೂ 3Ⴓ༤഻০b
+b
+•ࣉᇕোᇯ
+ֻ1ࣇ1–2ֻ3ႇĎ b
+3.2׮
+ק୸൦ए৖ଢѓb
+• ଢѓᄝए৖ଽb
+•֓ן
+ֆ໊Ď b
+•֥
+b
+•ֆ໊ຶ/b
+3.3ି
+•ࠌ۾׮ק
+৯ᆴb
+•ିའ
+෿หྟđൌགྷ 3–5 ᇕč২ೂğֆุ࿌ᄑa
+ᆰཌ AOEĎ b
+•ֆ໊ളଁᆴ ≤ 0֒෮Ⴕֆ໊ളଁᆴ ಆ҆ ≤ 0ෘ
+b
+ᆜĎ
+৯ᆴ 0৯Ď
+گ߭۾10৯ᆴ
+৯ᆴ ২ೂ 60ႇྦॖ҂๝Ď
+ਈđೂૄ 60 ᆠčჿ 1၂Ց
+ਈđೂૄ 20۬
+ඔᆴ 1 ྒֆ໊ ATKၰ 20–50đHPၰ 200–500
+2ၰູ 1֥1.5–2 П
+वඔᄹӉ ૄ 3ದඋྟิശჿ 20%
+6
+
+===== PAGE 7 =====
+࠹Synera: Synergy Auto-Arena 2026 Խ
+ؽ؍ࢨChecklist
+• [ ] ປӮሙС/׶/b
+• [ ]ളӮѩෛ੽Ցᄹ఼b
+• [ ]čIdle/Moving/Attacking/Casting/DeadĎ b
+• [ ]ᄵč୸൦ए৖ +Ď b
+• [ ]ஷሏb
+• [ ]෿č3–5ෘb
+4೘
+4.1࠶ࣜ
+лb
+۱ᅱଟ౵čShopĎ܂5ࡅ
+b
+ದ१༢๤ğӆഈֆ໊ඔ൳ದ१ഈཋჿඏđԚ൓ದ१ഈཋູ 3–4лശ
+ದ१ഈཋ+1ӆഈֆ໊ඔၘղದ१ഈཋ
+ູ 8Ď b
+4.2 ᪉ϸ༢๤
+ѩൌགྷ 4–6 ᇕᆯြ/ಆअ
+BuffႇྦᇀഒႚႵ1–2 ᇕѓదb
+ൔေ౰ൌ
+གྷğ
+•োğೂ” ᅞൖ”֞2/4ࡊ޹ࡆ/ളଁᆴb
+•эোğೂ”ഽ”֞3ࠇ”Ⴓ༭”ੱ৵
+ਆՑb
+ေ౰ğᄝ 4–6ݣ2োބ1эোđఃჅ
+૭ඍb
+7
+
+===== PAGE 8 =====
+࠹Synera: Synergy Auto-Arena 2026 Խ
+4.3აልС
+ೂ༯ေ౰ğ
+ᇅႚႵ3֥1
+ྒֆ໊Ď đᄵᄝѩູ 1֥2 ྒֆ໊ؿ
+ֻ֤ࠆ࣍3ֆ໊Ќ਽ᄝჰ໊Ď b2ཁᇷ
+ၰູ 1֥1.5–2 ПĎ b
+ઋልСণᇏbທ
+Ԭպ1ࡱልС č2 ྒֆ໊ॖঔᅚູ 2đ
+ቔູॖ࿊ঔᅚĎ b୆сྶᇀഒൌགྷၛ༯4 ᇕԤልСğ
+ݔ
+৯ +15
+ളଁᆴ +150
+ิശ 20%
+৯ᆴ −30Ď
+ልСᇕোb
+4.4֖
+྽ਙ
+đ ѩཿ
+ሑ෿b
+ᇅb
+4.5 GUI
+֥GUIaഈ૫
+࿓ਈ /лඔ/ᅱଟ౵aልС /᪉ϸ/భ੽Ց /ࢨ
+؍/Ԥඋྟ૫ϰb
+b
+8
+
+===== PAGE 9 =====
+࠹Synera: Synergy Auto-Arena 2026 Խ
+೘ Checklist
+• [ ]č5ᅱଟ໊Ď b
+• [ ]b
+• [ ]აഈᆔದඔཋᇅb
+• [ ] ൌགྷ 4–6 ᇕᆯြ/ᇕቂčᇀഒԛགྷ 2ߌܻ1֥
+᪉ϸĎ b
+• [ ] ൌགྷശྒč3ކ1Ďა 2 ྒඋྟิശb
+• [ ]ઋaԬպཋᇅაᇀഒ 4ԤልСb
+• [ ]֖/ᇅb
+• [ ] GUIྐ༏b
+5ඹ
+֥ٳ10%ିđ္ॖၛ
+֤
+ཟğ
+•༢๤ğႄೆૄ 10лӁള 1֥”ᇅ”৵഻/ຓ
+ৣb
+•Ӯඎ׮
+֥ݔ”ልС”Ď b
+•ކࢲྛ໾č ProjectilesĎ đ
+b
+•ࠏࡼPvE֥PvPb൐Ⴈ Socket۲ࡅ
+ᅞb
+• ᅞᆚ૙໼/൪့༢๤b
+•ֱb
+9
+
+===== PAGE 10 =====
+࠹Synera: Synergy Auto-Arena 2026 Խ
+ඹ Checklist
+• [ ] ࿊ᄴѩൌགྷᇀഒ 1ିb
+• [ ]Ď b
+• [ ]ႋ GUI/ᅚൕb
+• [ ] ᄝ READMEb
+6 ൌဒᆷଲ
+۳
+୆ջটϺᇹb
+6.1 GUI ა Starter Code
+൐Ⴈ Qt টປӮൌဒđ֌Чཛଢ҂ཋᇅႿ QtđSDL2९္
+ඔđ֌сྶ൐Ⴈ C/C++b
+ࡩ
+1. Qtğ(https://www.qt.io/)֥C++bุਈ
+֥؟ࢠQtٺQtӱğ
+https://qtguide.ustclug.org/ކQtCreatorҪჰ৘
+࿐đ ധೆరԛĠhttps://wizardforcel.gitbooks.io/qt-beginning/
+content/ؿAppьॹ෎ഈ൭b
+2. SDL2ğ(https://www.libsdl.org/)Ⴟ C๭ྙᛴ
+ۿ
+ٺSDL2ӱğhttps://lazyfoo.net/
+tutorials/SDL/b
+ॹ෎ഈ൭ QTđ֥Starter Codeھ
+Demo ൐Ⴈ Qtᇅb ୆ॖ
+ႿՎ Demoؿ/ܒOOP֥࠭
+PA proj b
+10
+
+===== PAGE 11 =====
+࠹Synera: Synergy Auto-Arena 2026 Խ
+6.2ࠏ
+ൔ
+൞൐Ⴈߌק60 fps֥update()Ď b
+۱ࠏFSM)ൈख़ႋ
+ԩႿၛ༯ሑ෿ᆭ၂ğIdlečॢ༽Ď aMovingᇏĎ aAttackingభဨĎ aCasting
+ᇏĎ aDeadഒBugӁളb
+6.3 ࿙ਫ਼აॖղྟ
+č TileMapႪ༵
+ෆ෬čBFSࠇA*b
+đၹՎ࿙ਫ਼ ҂ႋ
+֥ࣥ
+čRe-pathingĎ b๝ൈေԩ৘”ᇁ໭ਫ਼ॖሼ”ஷሏቅೖ౦
+ঃb
+6.4ק
+ದđ
+đ
+֞߭ࠧIdleଢѓb
+6.5౼
+೤čUnitିหིaUI֥ݺ
+ିൌགྷb
+ሧჷğ
+• Kenney (https://kenney.nl/assets)ෆ෬”strategy”, ”RPG”, ”UI”োb
+ఃᇏ 1-bit packaTiny RPG ForestႳ༤b
+• OpenGameArt (https://opengameart.org)ğ ෆ෬”character sprite 32x32”ࠇtilemap
+RPG”๭෍ҋb ᇿၩೱ࿊LicensečႪ༵࿊ᄴ CC0ࠇCC-BYĎ b
+• itch.io (https://itch.io/game-assets)ğೱ࿊ѓద”sprite”, ”characters”, ”tiles” đ
+෍ҋЇb
+• CraftPix (https://craftpix.net)ᇉਈ 2Da
+UIෆ෬”2D character”, ”fantasy RPG”, ”top-down”Սb
+ၰğ
+11
+
+===== PAGE 12 =====
+࠹Synera: Synergy Auto-Arena 2026 Խ
+•೤๭ѓၰ൐Ⴈ 32 × 32ࠇ64 × 64֥PNG๭ோđ
+Ⴈॶ + ໓ሳѓᇿॶཿ” ᅞൖ”aড೤ཿ”ഽ”Ďປ
+b
+• ఄ஍ა UIݖQt
+൐Ⴈ QPainter໓ሳb
+•ൔğႪ༵൐Ⴈ PNGĎ đх૧JPGĎ b
+•৘ࡹassets/ࠇres/đο assets/units/a
+assets/ui/aassets/effects/b
+W ARNING
+൐Ⴈčೂ CC0෍ҋĠೂླඇ଀đ౨ᄝཛଢ
+ӀӀᆭᅞĎ b
+ѩ҂ᄝႿ GUI֥GUI
+ඔb
+7ิ໙
+Question 7.1
+ิ໙Ĥ
+ิ໙ൈđ౨቎࿖ၛ༯ჰᄵğ
+•ഈ༯໓֞
+ऎุհ༂ྐ༏b
+• ༵ෆ෬/AI ᄜิ໙ෆ෬ႄౣ čGoogleaStack OverflowĎ Ұᅳো
+ཟ ChatgptaDeepseekճσđඪ
+थ໙ีb
+•؍ս઒đ౨൐Ⴈ markdownٚ
+b
+•໙ีᄹ
+b
+12
+
+===== PAGE 13 =====
+࠹Synera: Synergy Auto-Arena 2026 Խ
+Question 7.2
+Ĥ
+•໙ีğೂ “ᅰਔ”a“ਔ”đᆃো໙ี...
+• щၲ errorհ༂ิൕѩྩᆞb
+•໙ีğିᄝభ 3ଦট໙b
+ᄎ
+ྐ༏b
+8ඪૼ
+8.1ൔ
+ଽಸູཛଢ࿢෪Їč.zipࠇtar.gzĎ đ౨ༀсᄝյЇభัԢщၲള
+čೂbuild/a*.oႳ༤ࡱb
+8.2֖README)
+܂README.mdၛ༯ଽಸğ
+1.Чྐ༏b
+2.ܒࢲb
+3.ܒࢲྏোčೂ Unit, Boardିb
+4.૭ඍෘĎ b
+5.ඔඔĎ b
+8.3 AI ൐Ⴈඪૼ
+০Ⴈ AIđ ֌сྶປಆᅧ॥ս઒ࢫAI ൐Ⴈඪૼ”ğ
+•߃ܿႮ AIᇹb
+•༅ğ็ԛᇀഒ۱Ⴎ AI൤ః
+֥AI૫ਢ࿸ᇗ२
+b
+13
+
+===== PAGE 14 =====
+࠹ Synera: Synergy Auto-Arena 2026 Խ
+9 ۬ڄ
+• འ (OOP)ো
+ѩஊളऎุႇྦোb
+• ྘щӱৣ൐Ⴈ STLčೂ std::vector, std::map᪉ϸb
+• ၳӈԩ৘൐Ⴈtry-catch հ༂ൈ
+ള SegfaultĎ b
+• ߄൐Ⴈ clang-formatb
+10 ඪૼაᇁ྆
+10.1 ඪૼ
+• ଢѓაቋ
+ေ౰b
+• ିေ౰భิ
+৘ঔᅚb
+• ๤၂ඪૼູሙb
+10.2 ཛଢඪૼ
+• ᇶေটჷႿ Auto-battler ᇅ
+b
+• ࿞਀b
+10.3 ᇁ྆
+• ज़ӱ PA აಣ౦b
+• ׮ PA ປ
+b๝ൈđหљᇁ྆ЧՑ PA 的设计者李世昌。
+ሀ୆ᄝൌགྷ Synera ۽
+ି৯đPA ඨ০Ć
+14
