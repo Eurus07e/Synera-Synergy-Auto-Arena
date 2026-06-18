@@ -36,3 +36,9 @@ ui_*.h
 *.log
 
 # Project ignore rules
+
+# Local analysis/submission artifacts
+tmp/
+gcPA/
+pa.pdf
+Synera_PA_Submission_*.zip
